@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>므낫세 어드민</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+/* ── 변수 ── */
+:root {
+  --bg: #0f1117;
+  --surface: #1a1d26;
+  --border: #2a2d3a;
+  --text: #e8eaf0;
+  --muted: #6b7280;
+  --purchase: #E85D5D;
+  --purchase-dim: rgba(232,93,93,0.15);
+  --sales: #2B9E9E;
+  --sales-dim: rgba(43,158,158,0.15);
+  --amber: #F59E0B;
+  --amber-dim: rgba(245,158,11,0.15);
+  --green: #10B981;
+  --red: #EF4444;
+  --purple: #8B5CF6;
+  --r: 8px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: -apple-system, 'Apple SD Gothic Neo', sans-serif; font-size: 14px; min-height: 100vh; }
+
+/* ── 레이아웃 ── */
+.app { display: flex; flex-direction: column; height: 100vh; }
+header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 16px; display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+header h1 { font-size: 15px; font-weight: 700; letter-spacing: -0.3px; padding: 12px 0; }
+header .date { color: var(--muted); font-size: 12px; margin-left: auto; }
+
+/* ── 탭 네비 ── */
+nav { background: var(--surface); border-bottom: 1px solid var(--border); display: flex; overflow-x: auto; flex-shrink: 0; }
+nav::-webkit-scrollbar { display: none; }
+.tab-btn { padding: 10px 16px; border: none; background: none; color: var(--muted); cursor: pointer; font-size: 13px; white-space: nowrap; border-bottom: 2px solid transparent; transition: all 0.15s; }
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active { color: var(--text); border-bottom-color: var(--amber); font-weight: 600; }
+
+/* ── 콘텐츠 ── */
+main { flex: 1; overflow-y: auto; padding: 16px; }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ── 공통 컴포넌트 ── */
+.section-title { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 12px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 14px; }
+.btn { padding: 7px 14px; border-radius: 6px; border: none; cursor: pointer; font-size: 13px; font-weight: 600; transition: opacity 0.15s; }
+.btn:hover { opacity: 0.85; }
+.btn-primary { background: var(--amber); color: #000; }
+.btn-ghost { background: var(--border); color: var(--text); }
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+.badge { display: inline-block; padding: 2px 7px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+.badge-purchase { background: var(--purchase-dim); color: var(--purchase); }
+.badge-sales { background: var(--sales-dim); color: var(--sales); }
+.badge-amber { background: var(--amber-dim); color: var(--amber); }
+.badge-green { background: rgba(16,185,129,0.15); color: var(--green); }
+.badge-red { background: rgba(239,68,68,0.15); color: var(--red); }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; }
+@media(max-width:600px) { .grid-4 { grid-template-columns: repeat(2,1fr); } .grid-2 { grid-template-columns: 1fr; } }
+.stat-box { text-align: center; }
+.stat-num { font-size: 28px; font-weight: 700; line-height: 1.1; }
+.stat-label { font-size: 11px; color: var(--muted); margin-top: 3px; }
+.stat-sub { font-size: 11px; color: var(--green); margin-top: 2px; }
+.mt8 { margin-top: 8px; }
+.mt16 { margin-top: 16px; }
+.mt24 { margin-top: 24px; }
+.flex { display: flex; }
+.items-center { align-items: center; }
+.gap8 { gap: 8px; }
+.gap12 { gap: 12px; }
+.ml-auto { margin-left: auto; }
+.w100 { width: 100%; }
+select, input, textarea { background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 7px 10px; font-size: 13px; width: 100%; outline: none; }
+select:focus, input:focus, textarea:focus { border-color: var(--amber); }
+label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px; }
+.form-group { margin-bottom: 12px; }
+.alert { padding: 8px 12px; border-radius: 6px; font-size: 13px; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.alert-warning { background: var(--amber-dim); border-left: 3px solid var(--amber); }
+.alert-danger  { background: rgba(239,68,68,0.1); border-left: 3px solid var(--red); }
+.alert-info    { background: rgba(43,158,158,0.1); border-left: 3px solid var(--sales); }
+.empty { text-align: center; color: var(--muted); padding: 40px 0; font-size: 13px; }
+.loading { text-align: center; color: var(--muted); padding: 60px 0; }
+
+/* ── 채널 바 ── */
+.channel-bar { margin-bottom: 6px; }
+.channel-bar-label { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 3px; }
+.bar-track { background: var(--border); border-radius: 3px; height: 6px; }
+.bar-fill  { height: 6px; border-radius: 3px; background: var(--amber); transition: width 0.4s; }
+
+/* ── 칸반 ── */
+.kanban { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 8px; }
+.kanban::-webkit-scrollbar { height: 4px; }
+.kanban::-webkit-scrollbar-track { background: var(--border); }
+.kanban::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 2px; }
+.kanban-col { min-width: 180px; flex-shrink: 0; }
+.kanban-col-header { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; padding: 6px 0; display: flex; align-items: center; justify-content: space-between; }
+.kanban-col-count { background: var(--border); border-radius: 10px; padding: 1px 7px; font-size: 11px; color: var(--text); }
+.kanban-cards { display: flex; flex-direction: column; gap: 6px; min-height: 100px; }
+.k-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 10px; cursor: pointer; transition: border-color 0.15s; }
+.k-card:hover { border-color: var(--amber); }
+.k-card-name { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
+.k-card-model { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+.k-card-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.k-card-days { font-size: 11px; color: var(--muted); }
+.k-card-days.warn { color: var(--amber); }
+
+/* ── 재고 카드 ── */
+.inv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px,1fr)); gap: 10px; }
+.inv-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 14px; }
+.inv-card.warn60 { border-color: var(--amber); }
+.inv-card.warn90 { border-color: var(--red); }
+.inv-card-model { font-weight: 700; margin-bottom: 4px; }
+.inv-card-price { font-size: 18px; font-weight: 700; color: var(--amber); margin: 6px 0; }
+.inv-card-meta { font-size: 12px; color: var(--muted); }
+.inv-card-days { font-size: 12px; margin-top: 6px; }
+
+/* ── 콘텐츠 캘린더 ── */
+.cal-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 4px; }
+.cal-day-label { text-align: center; font-size: 11px; color: var(--muted); padding: 4px; }
+.cal-cell { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; min-height: 70px; padding: 4px; font-size: 11px; }
+.cal-cell-date { color: var(--muted); margin-bottom: 2px; }
+.cal-dot { width: 6px; height: 6px; border-radius: 50%; margin: 1px; display: inline-block; }
+.content-row { padding: 8px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+.content-row:last-child { border-bottom: none; }
+
+/* ── 퍼널 ── */
+.funnel-wrap { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.funnel-bar-row { width: 100%; display: flex; align-items: center; gap: 10px; }
+.funnel-bar-label { width: 100px; text-align: right; font-size: 12px; color: var(--muted); flex-shrink: 0; }
+.funnel-bar-track { flex: 1; background: var(--border); border-radius: 4px; height: 28px; position: relative; overflow: hidden; }
+.funnel-bar-fill { height: 100%; border-radius: 4px; transition: width 0.5s; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #fff; }
+.funnel-bar-count { width: 30px; font-size: 13px; font-weight: 700; }
+
+/* ── 로드맵 ── */
+.roadmap { position: relative; padding-left: 24px; }
+.roadmap::before { content:''; position:absolute; left:8px; top:0; bottom:0; width:2px; background:var(--border); }
+.rm-phase { margin-bottom: 32px; position: relative; }
+.rm-phase::before { content:''; position:absolute; left:-20px; top:4px; width:12px; height:12px; border-radius:50%; background:var(--border); border:2px solid var(--muted); }
+.rm-phase.active::before { background:var(--amber); border-color:var(--amber); box-shadow:0 0 8px var(--amber); }
+.rm-phase.done::before { background:var(--green); border-color:var(--green); }
+.rm-phase-title { font-weight: 700; margin-bottom: 8px; }
+.rm-phase.active .rm-phase-title { color: var(--amber); }
+.rm-item { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px; font-size: 13px; }
+.rm-check { width: 16px; height: 16px; border: 1.5px solid var(--border); border-radius: 3px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; margin-top: 1px; cursor: pointer; }
+.rm-check.checked { background: var(--green); border-color: var(--green); }
+.rm-trigger { font-size: 11px; color: var(--amber); margin-top: 6px; padding: 4px 8px; background: var(--amber-dim); border-radius: 4px; display: inline-block; }
+
+/* ── 모달 ── */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100; align-items: center; justify-content: center; }
+.modal-overlay.open { display: flex; }
+.modal { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; width: 90%; max-width: 480px; max-height: 85vh; overflow-y: auto; }
+.modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.modal-title { font-weight: 700; font-size: 15px; }
+.modal-close { background: none; border: none; color: var(--muted); font-size: 20px; cursor: pointer; line-height: 1; }
+.stage-btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.stage-btn { padding: 5px 10px; border-radius: 20px; border: 1px solid var(--border); background: none; color: var(--text); font-size: 12px; cursor: pointer; }
+.stage-btn:hover { border-color: var(--amber); color: var(--amber); }
+.stage-btn.current { background: var(--amber); color: #000; border-color: var(--amber); font-weight: 700; }
+.stage-btn.drop { border-color: var(--red); color: var(--red); }
+
+/* ── 퀵 리드 입력 ── */
+.fab { position: fixed; bottom: 20px; right: 20px; width: 52px; height: 52px; border-radius: 50%; background: var(--amber); color: #000; border: none; font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 16px rgba(245,158,11,0.4); z-index: 50; }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- 헤더 -->
+  <header>
+    <h1>므낫세 어드민</h1>
+    <span class="date" id="todayDate"></span>
+  </header>
+
+  <!-- 탭 네비 -->
+  <nav>
+    <button class="tab-btn active" data-tab="dashboard">대시보드</button>
+    <button class="tab-btn" data-tab="purchase">매입 파이프라인</button>
+    <button class="tab-btn" data-tab="sales">매출 파이프라인</button>
+    <button class="tab-btn" data-tab="inventory">재고</button>
+    <button class="tab-btn" data-tab="content">콘텐츠</button>
+    <button class="tab-btn" data-tab="funnel">퍼널 분석</button>
+    <button class="tab-btn" data-tab="roadmap">로드맵</button>
+  </nav>
+
+  <!-- 메인 -->
+  <main>
+
+    <!-- ── 대시보드 ── -->
+    <div class="tab-panel active" id="tab-dashboard">
+      <div id="dash-loading" class="loading">데이터 불러오는 중...</div>
+      <div id="dash-content" style="display:none">
+        <div class="grid-4" id="dash-stats"></div>
+        <div class="mt16" id="dash-alerts"></div>
+        <div class="grid-2 mt16">
+          <div class="card">
+            <div class="section-title">채널별 유입</div>
+            <div id="channel-bars"></div>
+          </div>
+          <div class="card">
+            <div class="section-title">주간 추이</div>
+            <canvas id="kpiChart" height="160"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 매입 파이프라인 ── -->
+    <div class="tab-panel" id="tab-purchase">
+      <div class="flex items-center gap8 mt8" style="margin-bottom:12px">
+        <span class="section-title" style="margin:0">매입 파이프라인</span>
+        <button class="btn btn-primary btn-sm ml-auto" onclick="openLeadModal('매입')">+ 리드 추가</button>
+      </div>
+      <div id="purchase-loading" class="loading">불러오는 중...</div>
+      <div class="kanban" id="purchase-kanban"></div>
+    </div>
+
+    <!-- ── 매출 파이프라인 ── -->
+    <div class="tab-panel" id="tab-sales">
+      <div class="flex items-center gap8 mt8" style="margin-bottom:12px">
+        <span class="section-title" style="margin:0">매출 파이프라인</span>
+        <button class="btn btn-primary btn-sm ml-auto" onclick="openLeadModal('매출')">+ 리드 추가</button>
+      </div>
+      <div id="sales-loading" class="loading">불러오는 중...</div>
+      <div class="kanban" id="sales-kanban"></div>
+    </div>
+
+    <!-- ── 재고 ── -->
+    <div class="tab-panel" id="tab-inventory">
+      <div class="flex items-center gap8 mt8" style="margin-bottom:12px">
+        <span class="section-title" style="margin:0">재고 현황</span>
+        <button class="btn btn-primary btn-sm ml-auto" onclick="openInventoryModal()">+ 재고 추가</button>
+      </div>
+      <div id="inventory-loading" class="loading">불러오는 중...</div>
+      <div class="inv-grid" id="inventory-grid"></div>
+    </div>
+
+    <!-- ── 콘텐츠 ── -->
+    <div class="tab-panel" id="tab-content">
+      <div class="flex items-center gap8 mt8" style="margin-bottom:12px">
+        <span class="section-title" style="margin:0">콘텐츠 캘린더</span>
+        <button class="btn btn-primary btn-sm ml-auto" onclick="openContentModal()">+ 콘텐츠 추가</button>
+      </div>
+      <div id="content-loading" class="loading">불러오는 중...</div>
+      <div class="card" id="content-list"></div>
+    </div>
+
+    <!-- ── 퍼널 분석 ── -->
+    <div class="tab-panel" id="tab-funnel">
+      <div id="funnel-loading" class="loading">불러오는 중...</div>
+      <div id="funnel-content" style="display:none">
+        <div class="grid-2">
+          <div class="card">
+            <div class="section-title">매입 퍼널</div>
+            <div class="funnel-wrap" id="purchase-funnel"></div>
+          </div>
+          <div class="card">
+            <div class="section-title">매출 퍼널</div>
+            <div class="funnel-wrap" id="sales-funnel"></div>
+          </div>
+        </div>
+        <div class="card mt16">
+          <div class="section-title">채널별 전환율</div>
+          <canvas id="channelChart" height="120"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 로드맵 ── -->
+    <div class="tab-panel" id="tab-roadmap">
+      <div class="card" style="margin-top:8px">
+        <div class="roadmap" id="roadmap-content"></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- FAB -->
+<button class="fab" onclick="openLeadModal(null)" title="리드 추가">+</button>
+
+<!-- ── 모달: 리드 추가 ── -->
+<div class="modal-overlay" id="lead-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="lead-modal-title">리드 추가</span>
+      <button class="modal-close" onclick="closeModal('lead-modal')">×</button>
+    </div>
+    <div class="form-group">
+      <label>유형</label>
+      <select id="lead-type">
+        <option value="매입">매입 (팔고싶은 분)</option>
+        <option value="매출">매출 (사고싶은 분)</option>
+        <option value="대기">입고 알림 대기</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>이름/닉네임</label>
+      <input type="text" id="lead-name" placeholder="홍길동">
+    </div>
+    <div class="form-group">
+      <label>연락처 (전화/아이디)</label>
+      <input type="text" id="lead-contact" placeholder="010-1234-5678 or 인스타@닉네임">
+    </div>
+    <div class="form-group">
+      <label>유입채널</label>
+      <select id="lead-channel">
+        <option value="인스타DM">인스타DM</option>
+        <option value="카카오DM">카카오DM</option>
+        <option value="카카오톡">카카오톡</option>
+        <option value="문자">문자(SMS)</option>
+        <option value="번개장터">번개장터</option>
+        <option value="당근마켓">당근마켓</option>
+        <option value="네이버카페">네이버카페</option>
+        <option value="보관고객">보관고객</option>
+        <option value="딜러소개">딜러소개</option>
+        <option value="지인소개">지인소개</option>
+        <option value="기타">기타</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>RTT 모델</label>
+      <input type="text" id="lead-model" placeholder="스카이캠프 2.0 / 미니 3.0 등">
+    </div>
+    <div id="purchase-extra">
+      <div class="form-group">
+        <label>사용기간</label>
+        <input type="text" id="lead-usage" placeholder="2년 / 1년 6개월">
+      </div>
+      <div class="form-group">
+        <label>상태 등급 (파악된 경우)</label>
+        <select id="lead-grade">
+          <option value="미확인">미확인</option>
+          <option value="A">A — 거의 새것</option>
+          <option value="B">B — 정상 사용</option>
+          <option value="C">C — 수리 필요</option>
+        </select>
+      </div>
+    </div>
+    <div id="sales-extra" style="display:none">
+      <div class="form-group">
+        <label>예산대</label>
+        <input type="text" id="lead-budget" placeholder="150만원 이하 / 200만원 내외">
+      </div>
+      <div class="form-group">
+        <label>보유 차종</label>
+        <input type="text" id="lead-cartype" placeholder="팰리세이드 / 스타리아 / 없음">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>메모 (DM/문자 내용 요약)</label>
+      <textarea id="lead-memo" rows="2" placeholder="받은 메시지 핵심 내용..."></textarea>
+    </div>
+    <button class="btn btn-primary w100" onclick="submitLead()">저장 → 시트 자동 반영</button>
+  </div>
+</div>
+
+<!-- ── 모달: 카드 상세 ── -->
+<div class="modal-overlay" id="card-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="card-modal-title"></span>
+      <button class="modal-close" onclick="closeModal('card-modal')">×</button>
+    </div>
+    <div id="card-modal-body"></div>
+  </div>
+</div>
+
+<!-- ── 모달: 재고 추가 ── -->
+<div class="modal-overlay" id="inv-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">재고 추가</span>
+      <button class="modal-close" onclick="closeModal('inv-modal')">×</button>
+    </div>
+    <div class="form-group"><label>모델</label><input type="text" id="inv-model" placeholder="iKamper Skycamp 2.0"></div>
+    <div class="form-group"><label>등급</label><select id="inv-grade"><option>A</option><option>B</option><option>C</option></select></div>
+    <div class="grid-2 gap8">
+      <div class="form-group"><label>매입가 (만원)</label><input type="number" id="inv-buy" placeholder="85"></div>
+      <div class="form-group"><label>판매가 (만원)</label><input type="number" id="inv-sell" placeholder="165"></div>
+    </div>
+    <div class="form-group"><label>수리 내역</label><input type="text" id="inv-repair" placeholder="힌지 수리, 방수 처리 등"></div>
+    <div class="form-group"><label>수리비 (만원)</label><input type="number" id="inv-repair-cost" placeholder="0"></div>
+    <div class="form-group"><label>리스팅 채널</label><input type="text" id="inv-listing" placeholder="번개장터, 인스타"></div>
+    <div class="form-group"><label>메모</label><textarea id="inv-memo" rows="2"></textarea></div>
+    <button class="btn btn-primary w100" onclick="submitInventory()">재고 등록</button>
+  </div>
+</div>
+
+<!-- ── 모달: 콘텐츠 추가 ── -->
+<div class="modal-overlay" id="content-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">콘텐츠 추가</span>
+      <button class="modal-close" onclick="closeModal('content-modal')">×</button>
+    </div>
+    <div class="form-group"><label>채널</label>
+      <select id="ct-channel">
+        <option>인스타그램</option><option>네이버블로그</option><option>티스토리</option>
+        <option>네이버카페</option><option>번개장터</option><option>당근마켓</option>
+      </select>
+    </div>
+    <div class="form-group"><label>유형</label>
+      <select id="ct-type">
+        <option>매입홍보</option><option>매출홍보</option><option>후기</option>
+        <option>정보성</option><option>비포애프터</option><option>특허키트</option>
+      </select>
+    </div>
+    <div class="form-group"><label>제목/내용 요약</label><input type="text" id="ct-title" placeholder="RTT 중고 시세표 인포그래픽"></div>
+    <div class="form-group"><label>발행 예정일</label><input type="date" id="ct-date"></div>
+    <div class="form-group"><label>URL (발행 후 입력)</label><input type="url" id="ct-url" placeholder="https://"></div>
+    <div class="form-group"><label>상태</label><select id="ct-status"><option>예정</option><option>발행</option><option>완료</option></select></div>
+    <button class="btn btn-primary w100" onclick="submitContent()">저장</button>
+  </div>
+</div>
+
+<!-- ── 설정 배너 ── -->
+<div id="setup-banner" style="display:none;position:fixed;top:0;left:0;right:0;background:#1a1d26;border-bottom:2px solid var(--amber);padding:12px 16px;z-index:200;font-size:13px;">
+  ⚙️ Apps Script URL을 입력해주세요:
+  <input type="url" id="script-url-input" placeholder="https://script.google.com/macros/s/.../exec" style="width:340px;margin:0 8px;">
+  <button class="btn btn-primary btn-sm" onclick="saveScriptUrl()">저장</button>
+</div>
+
+<script>
+// ============================================================
+// 설정
+// ============================================================
+const SCRIPT_URL_KEY = 'mnasse_script_url';
+let SCRIPT_URL = localStorage.getItem(SCRIPT_URL_KEY) || '';
+let CONFIG = { purchaseStages: [], salesStages: [], channels: [] };
+
+function saveScriptUrl() {
+  SCRIPT_URL = document.getElementById('script-url-input').value.trim();
+  localStorage.setItem(SCRIPT_URL_KEY, SCRIPT_URL);
+  document.getElementById('setup-banner').style.display = 'none';
+  initApp();
+}
+
+function checkSetup() {
+  if (!SCRIPT_URL) {
+    document.getElementById('setup-banner').style.display = 'block';
+    return false;
+  }
+  return true;
+}
+
+// ============================================================
+// API
+// ============================================================
+async function apiGet(action, params = {}) {
+  const url = new URL(SCRIPT_URL);
+  url.searchParams.set('action', action);
+  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+  const res = await fetch(url.toString());
+  return res.json();
+}
+
+async function apiPost(body) {
+  const res = await fetch(SCRIPT_URL, {
+    method: 'POST',
+    body: JSON.stringify(body)
+  });
+  return res.json();
+}
+
+// ============================================================
+// 탭
+// ============================================================
+let loadedTabs = {};
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    const tab = btn.dataset.tab;
+    document.getElementById('tab-' + tab).classList.add('active');
+    if (!loadedTabs[tab]) { loadTab(tab); loadedTabs[tab] = true; }
+  });
+});
+
+function loadTab(tab) {
+  // 로드맵은 API 없어도 렌더링
+  if (tab === 'roadmap') { renderRoadmap(); return; }
+  if (!checkSetup()) return;
+  switch (tab) {
+    case 'purchase':  loadPipeline('매입'); break;
+    case 'sales':     loadPipeline('매출'); break;
+    case 'inventory': loadInventory(); break;
+    case 'content':   loadContent(); break;
+    case 'funnel':    loadFunnel(); break;
+  }
+}
+
+// ============================================================
+// 대시보드
+// ============================================================
+let kpiChartInst = null;
+
+async function loadDashboard() {
+  if (!checkSetup()) return;
+  const data = await apiGet('dashboard');
+  const c = data.counts;
+
+  document.getElementById('dash-loading').style.display = 'none';
+  document.getElementById('dash-content').style.display = 'block';
+
+  document.getElementById('dash-stats').innerHTML = `
+    <div class="card stat-box">
+      <div class="stat-num" style="color:var(--purchase)">${c.purchase}</div>
+      <div class="stat-label">매입 리드</div>
+      <div class="stat-sub">+${c.purchaseWeek} 이번주</div>
+    </div>
+    <div class="card stat-box">
+      <div class="stat-num" style="color:var(--sales)">${c.sales}</div>
+      <div class="stat-label">매출 리드</div>
+      <div class="stat-sub">+${c.salesWeek} 이번주</div>
+    </div>
+    <div class="card stat-box">
+      <div class="stat-num" style="color:var(--amber)">${c.waitlist}</div>
+      <div class="stat-label">입고 대기</div>
+    </div>
+    <div class="card stat-box">
+      <div class="stat-num">${c.inventory}</div>
+      <div class="stat-label">보유 재고</div>
+      <div class="stat-sub">평균 ${c.avgInventoryDays}일</div>
+    </div>
+  `;
+
+  const alertsEl = document.getElementById('dash-alerts');
+  alertsEl.innerHTML = data.alerts.map(a => `
+    <div class="alert alert-${a.type === 'danger' ? 'danger' : a.type === 'warning' ? 'warning' : 'info'}">
+      ${a.type === 'danger' ? '🔴' : a.type === 'warning' ? '🟡' : 'ℹ️'} ${a.msg}
+    </div>`).join('');
+
+  // 채널 바
+  const cm = data.channelMap || {};
+  const total = Object.values(cm).reduce((s, v) => s + v, 0) || 1;
+  const sorted = Object.entries(cm).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  document.getElementById('channel-bars').innerHTML = sorted.map(([ch, cnt]) => `
+    <div class="channel-bar">
+      <div class="channel-bar-label"><span>${ch}</span><span>${Math.round(cnt/total*100)}%</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${cnt/total*100}%"></div></div>
+    </div>`).join('');
+
+  // KPI 차트
+  const kpi = data.recentKPI || [];
+  const labels = kpi.map(k => k['날짜'] ? k['날짜'].substring(5, 10) : '');
+  if (kpiChartInst) kpiChartInst.destroy();
+  kpiChartInst = new Chart(document.getElementById('kpiChart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: '매입문의', data: kpi.map(k => k['매입문의'] || 0), borderColor: '#E85D5D', tension: 0.3, fill: false },
+        { label: '매출문의', data: kpi.map(k => k['매출문의'] || 0), borderColor: '#2B9E9E', tension: 0.3, fill: false },
+      ]
+    },
+    options: {
+      plugins: { legend: { labels: { color: '#6b7280', font: { size: 11 } } } },
+      scales: {
+        x: { ticks: { color: '#6b7280', font: { size: 10 } }, grid: { color: '#2a2d3a' } },
+        y: { ticks: { color: '#6b7280', font: { size: 10 } }, grid: { color: '#2a2d3a' } }
+      }
+    }
+  });
+}
+
+// ============================================================
+// 칸반 파이프라인
+// ============================================================
+async function loadPipeline(type) {
+  const isPurchase = type === '매입';
+  const prefix = isPurchase ? 'purchase' : 'sales';
+  document.getElementById(prefix + '-loading').style.display = 'block';
+
+  const leads = await apiGet('pipeline', { type });
+  const stages = isPurchase ? CONFIG.purchaseStages : CONFIG.salesStages;
+  const sheetName = isPurchase ? '매입_파이프라인' : '매출_파이프라인';
+
+  document.getElementById(prefix + '-loading').style.display = 'none';
+
+  const kanban = document.getElementById(prefix + '-kanban');
+  kanban.innerHTML = stages.map(stage => {
+    const cards = leads.filter(l => l['파이프상태'] === stage);
+    return `
+      <div class="kanban-col">
+        <div class="kanban-col-header">
+          <span>${stage}</span>
+          <span class="kanban-col-count">${cards.length}</span>
+        </div>
+        <div class="kanban-cards">
+          ${cards.map(l => renderKCard(l, isPurchase, sheetName)).join('') || '<div style="font-size:11px;color:var(--muted);padding:8px 0">없음</div>'}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function renderKCard(lead, isPurchase, sheetName) {
+  const days = lead['날짜'] ? Math.floor((Date.now() - new Date(lead['날짜']).getTime()) / 86400000) : 0;
+  const warnClass = days > 7 ? 'warn' : '';
+  const channel = lead['유입채널'] || '';
+  const channelBadge = getChannelBadge(channel);
+  return `
+    <div class="k-card" onclick="openCardModal(${JSON.stringify(lead).replace(/"/g,"'")}, ${isPurchase}, '${sheetName}')">
+      <div class="k-card-name">${lead['이름'] || '(이름없음)'}</div>
+      <div class="k-card-model">${lead['RTT모델'] || lead['관심모델'] || '—'}</div>
+      <div class="k-card-meta">
+        ${channelBadge}
+        ${isPurchase && lead['상태등급'] && lead['상태등급'] !== '미확인' ? `<span class="badge badge-amber">${lead['상태등급']}급</span>` : ''}
+        <span class="k-card-days ${warnClass}">${days}일 경과</span>
+      </div>
+    </div>`;
+}
+
+function getChannelBadge(ch) {
+  const map = { '인스타DM':'badge-purchase','카카오DM':'badge-sales','카카오톡':'badge-sales','문자':'badge-amber','번개장터':'badge-green','당근마켓':'badge-green' };
+  const cls = map[ch] || 'badge-red';
+  return ch ? `<span class="badge ${cls}" style="font-size:10px">${ch}</span>` : '';
+}
+
+// ============================================================
+// 카드 상세 모달
+// ============================================================
+let currentCard = null;
+
+function openCardModal(leadStr, isPurchase, sheetName) {
+  const lead = typeof leadStr === 'string' ? JSON.parse(leadStr.replace(/'/g, '"')) : leadStr;
+  currentCard = { lead, isPurchase, sheetName };
+  const stages = isPurchase ? CONFIG.purchaseStages : CONFIG.salesStages;
+  const current = lead['파이프상태'];
+
+  document.getElementById('card-modal-title').textContent = `${lead['이름']} — ${lead['RTT모델'] || lead['관심모델'] || '모델미상'}`;
+  document.getElementById('card-modal-body').innerHTML = `
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px">
+      📞 ${lead['연락처'] || '—'} &nbsp;|&nbsp; 📥 ${lead['유입채널'] || '—'}
+      ${isPurchase ? `&nbsp;|&nbsp; 🏷 ${lead['상태등급'] || '미확인'}급` : `&nbsp;|&nbsp; 💰 ${lead['예산대'] || '—'}`}
+    </div>
+    ${lead['메모'] ? `<div style="background:var(--bg);padding:8px;border-radius:6px;font-size:12px;margin-bottom:12px;color:var(--muted)">${lead['메모']}</div>` : ''}
+    <div style="font-size:12px;color:var(--muted);margin-bottom:6px">단계 변경:</div>
+    <div class="stage-btns">
+      ${stages.map(s => `
+        <button class="stage-btn${s === current ? ' current' : ''}${s === 'DROP' ? ' drop' : ''}"
+          onclick="changeStage('${sheetName}','${lead['리드ID']}','${s}')">
+          ${s}
+        </button>`).join('')}
+    </div>
+    <div style="margin-top:16px">
+      <div class="form-group"><label>메모 수정</label>
+        <textarea id="memo-edit" rows="2">${lead['메모'] || ''}</textarea>
+      </div>
+      <button class="btn btn-ghost btn-sm w100" onclick="saveMemo('${sheetName}','${lead['리드ID']}')">메모 저장</button>
+    </div>`;
+
+  document.getElementById('card-modal').classList.add('open');
+}
+
+async function changeStage(sheetName, id, status) {
+  await apiPost({ action: 'updateStatus', sheet: sheetName, id, status });
+  closeModal('card-modal');
+  const type = sheetName.includes('매입') ? '매입' : '매출';
+  loadedTabs[type === '매입' ? 'purchase' : 'sales'] = false;
+  loadPipeline(type);
+}
+
+async function saveMemo(sheetName, id) {
+  const memo = document.getElementById('memo-edit').value;
+  await apiPost({ action: 'updateField', sheet: sheetName, id, field: '메모', value: memo });
+  closeModal('card-modal');
+}
+
+// ============================================================
+// 리드 추가 모달
+// ============================================================
+function openLeadModal(type) {
+  if (type) document.getElementById('lead-type').value = type;
+  toggleLeadExtras();
+  document.getElementById('lead-modal').classList.add('open');
+}
+
+document.getElementById('lead-type').addEventListener('change', toggleLeadExtras);
+
+function toggleLeadExtras() {
+  const type = document.getElementById('lead-type').value;
+  document.getElementById('purchase-extra').style.display = type === '매입' ? 'block' : 'none';
+  document.getElementById('sales-extra').style.display = type === '매출' ? 'block' : 'none';
+  document.getElementById('lead-modal-title').textContent = type === '대기' ? '입고 알림 대기 등록' : `리드 추가 — ${type}`;
+}
+
+async function submitLead() {
+  const type = document.getElementById('lead-type').value;
+  const name = document.getElementById('lead-name').value.trim();
+  const contact = document.getElementById('lead-contact').value.trim();
+  if (!name || !contact) { alert('이름과 연락처는 필수입니다.'); return; }
+
+  const data = {
+    name, contact,
+    channel: document.getElementById('lead-channel').value,
+    model: document.getElementById('lead-model').value,
+    memo: document.getElementById('lead-memo').value,
+  };
+
+  if (type === '매입') {
+    data.usage = document.getElementById('lead-usage').value;
+    data.grade = document.getElementById('lead-grade').value;
+    await apiPost({ action: 'addLead', type: '매입', data });
+    loadedTabs.purchase = false;
+    loadPipeline('매입');
+  } else if (type === '매출') {
+    data.budget = document.getElementById('lead-budget').value;
+    data.carType = document.getElementById('lead-cartype').value;
+    await apiPost({ action: 'addLead', type: '매출', data });
+    loadedTabs.sales = false;
+    loadPipeline('매출');
+  } else {
+    await apiPost({ action: 'addWaitlist', data });
+  }
+
+  closeModal('lead-modal');
+  resetForm(['lead-name','lead-contact','lead-model','lead-usage','lead-memo','lead-budget','lead-cartype']);
+}
+
+// ============================================================
+// 재고
+// ============================================================
+async function loadInventory() {
+  document.getElementById('inventory-loading').style.display = 'block';
+  const items = await apiGet('inventory');
+  document.getElementById('inventory-loading').style.display = 'none';
+
+  const grid = document.getElementById('inventory-grid');
+  if (!items.length) { grid.innerHTML = '<div class="empty">등록된 재고가 없습니다</div>'; return; }
+
+  grid.innerHTML = items.filter(i => i['판매상태'] !== '판매완료').map(item => {
+    const days = parseInt(item['보관일수']) || 0;
+    const warnClass = days >= 90 ? 'warn90' : days >= 60 ? 'warn60' : '';
+    const statusBadge = { '검수중':'badge-amber','수리중':'badge-red','판매가능':'badge-green','예약':'badge-sales','판매완료':'badge-green' };
+    return `
+      <div class="inv-card ${warnClass}">
+        <div class="inv-card-model">${item['모델'] || '—'}</div>
+        <div class="mt8">
+          <span class="badge badge-amber">${item['등급'] || '?'}급</span>
+          <span class="badge ${statusBadge[item['판매상태']] || ''}" style="margin-left:4px">${item['판매상태']}</span>
+        </div>
+        <div class="inv-card-price">${item['판매가'] ? item['판매가'] + '만원' : '미정'}</div>
+        <div class="inv-card-meta">매입가: ${item['매입가'] || '—'}만원</div>
+        <div class="inv-card-days" style="color:${days >= 90 ? 'var(--red)' : days >= 60 ? 'var(--amber)' : 'var(--muted)'}">
+          📦 보관 ${days}일${days >= 90 ? ' ⚠ 즉시 조정' : days >= 60 ? ' ⚠ 검토 필요' : ''}
+        </div>
+        ${item['리스팅채널'] ? `<div style="font-size:11px;color:var(--muted);margin-top:4px">📡 ${item['리스팅채널']}</div>` : ''}
+      </div>`;
+  }).join('');
+}
+
+function openInventoryModal() { document.getElementById('inv-modal').classList.add('open'); }
+
+async function submitInventory() {
+  const model = document.getElementById('inv-model').value.trim();
+  if (!model) { alert('모델명을 입력하세요.'); return; }
+  await apiPost({ action: 'addInventory', data: {
+    model, grade: document.getElementById('inv-grade').value,
+    purchasePrice: document.getElementById('inv-buy').value,
+    salePrice: document.getElementById('inv-sell').value,
+    repairDetail: document.getElementById('inv-repair').value,
+    repairCost: document.getElementById('inv-repair-cost').value,
+    listingChannel: document.getElementById('inv-listing').value,
+    memo: document.getElementById('inv-memo').value,
+    purchaseDate: new Date().toISOString()
+  }});
+  closeModal('inv-modal');
+  loadedTabs.inventory = false;
+  loadInventory();
+}
+
+// ============================================================
+// 콘텐츠
+// ============================================================
+const CHANNEL_COLORS = { '인스타그램':'#E85D5D','네이버블로그':'#2B9E9E','티스토리':'#F59E0B','네이버카페':'#10B981','번개장터':'#8B5CF6','당근마켓':'#EC4899' };
+
+async function loadContent() {
+  document.getElementById('content-loading').style.display = 'block';
+  const items = await apiGet('content');
+  document.getElementById('content-loading').style.display = 'none';
+
+  const list = document.getElementById('content-list');
+  if (!items.length) { list.innerHTML = '<div class="empty">등록된 콘텐츠가 없습니다</div>'; return; }
+
+  const sorted = [...items].sort((a, b) => new Date(b['날짜']) - new Date(a['날짜']));
+  list.innerHTML = sorted.map(item => {
+    const color = CHANNEL_COLORS[item['채널']] || '#6b7280';
+    const statusMap = { '예정':'badge-amber','발행':'badge-sales','완료':'badge-green' };
+    return `
+      <div class="content-row">
+        <span class="cal-dot" style="background:${color};width:8px;height:8px;flex-shrink:0"></span>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:600">${item['제목'] || '—'}</div>
+          <div style="font-size:11px;color:var(--muted)">${item['채널']} · ${item['유형']} · ${item['날짜'] ? String(item['날짜']).substring(0,10) : ''}</div>
+        </div>
+        <span class="badge ${statusMap[item['상태']] || ''}">${item['상태']}</span>
+        ${item['유입문의수'] > 0 ? `<span class="badge badge-green">${item['유입문의수']}건</span>` : ''}
+      </div>`;
+  }).join('');
+}
+
+function openContentModal() {
+  document.getElementById('ct-date').value = new Date().toISOString().substring(0,10);
+  document.getElementById('content-modal').classList.add('open');
+}
+
+async function submitContent() {
+  const title = document.getElementById('ct-title').value.trim();
+  if (!title) { alert('제목을 입력하세요.'); return; }
+  await apiPost({ action: 'addContent', data: {
+    channel: document.getElementById('ct-channel').value,
+    type: document.getElementById('ct-type').value,
+    title, date: document.getElementById('ct-date').value,
+    url: document.getElementById('ct-url').value,
+    status: document.getElementById('ct-status').value,
+  }});
+  closeModal('content-modal');
+  loadedTabs.content = false;
+  loadContent();
+}
+
+// ============================================================
+// 퍼널 분석
+// ============================================================
+let channelChartInst = null;
+
+async function loadFunnel() {
+  document.getElementById('funnel-loading').style.display = 'block';
+  const data = await apiGet('dashboard');
+  document.getElementById('funnel-loading').style.display = 'none';
+  document.getElementById('funnel-content').style.display = 'block';
+
+  renderFunnelBars('purchase-funnel', data.purchaseFunnel, '#E85D5D');
+  renderFunnelBars('sales-funnel', data.salesFunnel, '#2B9E9E');
+
+  // 채널 차트
+  const cm = data.channelMap || {};
+  if (channelChartInst) channelChartInst.destroy();
+  channelChartInst = new Chart(document.getElementById('channelChart'), {
+    type: 'bar',
+    data: {
+      labels: Object.keys(cm),
+      datasets: [{ label: '리드 수', data: Object.values(cm), backgroundColor: '#F59E0B' }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#6b7280' }, grid: { display: false } },
+        y: { ticks: { color: '#6b7280', precision: 0 }, grid: { color: '#2a2d3a' } }
+      }
+    }
+  });
+}
+
+function renderFunnelBars(elId, funnel, color) {
+  const el = document.getElementById(elId);
+  const max = Math.max(...funnel.map(f => f.count), 1);
+  el.innerHTML = funnel.filter(f => f.stage !== 'DROP').map(f => `
+    <div class="funnel-bar-row">
+      <div class="funnel-bar-label">${f.stage}</div>
+      <div class="funnel-bar-track">
+        <div class="funnel-bar-fill" style="width:${f.count/max*100}%;background:${color}">
+          ${f.count > 0 ? f.count : ''}
+        </div>
+      </div>
+      <div class="funnel-bar-count">${f.count}</div>
+    </div>`).join('');
+}
+
+// ============================================================
+// 로드맵
+// ============================================================
+const ROADMAP = [
+  {
+    phase: 'Phase 1 — 퍼널 구축 + 테스트', active: true, done: false,
+    trigger: '트리거: 매입+매출 각 3건 리드 확보',
+    items: [
+      '어드민 완성 (지금 보고 있는 이것)',
+      '인스타 개설 + 첫 콘텐츠 10개',
+      '블로그 글 5개 (검색 상위 노출용)',
+      'DM/문자 받고 → 어드민 리드 입력 루틴 정착',
+      '매입 DM 응대 스크립트 준비',
+      '매출 DM 응대 스크립트 준비',
+      '첫 매입 리드 확보',
+      '첫 매출 리드 확보',
+    ]
+  },
+  {
+    phase: 'Phase 2 — 첫 거래 + 프로세스 검증', active: false, done: false,
+    trigger: '트리거: 매입·판매 각 3건 × 3개월 연속',
+    items: [
+      '첫 매입 1대 실행 (위탁 or 확실한 건)',
+      '검수·수리 프로세스 1회전 실측',
+      '첫 판매 1대 성사',
+      '전 과정 데이터 기록·분석',
+      '단위경제 실측치 → 시트 갱신',
+    ]
+  },
+  {
+    phase: 'Phase 3 — 규모 확장', active: false, done: false,
+    trigger: '트리거: 월 10건 + 해외 첫 거래 완료',
+    items: [
+      'KPL 물류 본격 연계',
+      '전국 딜러 위탁매입 시작',
+      'BaseCamper / eBay 해외 리스팅 테스트',
+      '월 10건 달성',
+    ]
+  },
+  {
+    phase: 'Phase 4 — 전국화 + 글로벌', active: false, done: false,
+    trigger: '트리거: 월 30건 + 해외 비중 30%+',
+    items: [
+      '전국 아이캠퍼 딜러 네트워크 가동',
+      '지방 셔틀트럭 합차 수거 시작',
+      '북미·캐나다·호주 진출',
+    ]
+  }
+];
+
+function renderRoadmap() {
+  const savedChecks = JSON.parse(localStorage.getItem('roadmap_checks') || '{}');
+  document.getElementById('roadmap-content').innerHTML = ROADMAP.map((p, pi) => `
+    <div class="rm-phase ${p.active ? 'active' : ''}${p.done ? 'done' : ''}">
+      <div class="rm-phase-title">${p.phase}</div>
+      ${p.items.map((item, ii) => {
+        const key = `${pi}_${ii}`;
+        const checked = savedChecks[key];
+        return `
+          <div class="rm-item">
+            <div class="rm-check ${checked ? 'checked' : ''}" onclick="toggleCheck('${key}', this)">
+              ${checked ? '✓' : ''}
+            </div>
+            <span style="${checked ? 'color:var(--muted);text-decoration:line-through' : ''}">${item}</span>
+          </div>`;
+      }).join('')}
+      <div class="rm-trigger">${p.trigger}</div>
+    </div>`).join('');
+}
+
+function toggleCheck(key, el) {
+  const checks = JSON.parse(localStorage.getItem('roadmap_checks') || '{}');
+  checks[key] = !checks[key];
+  localStorage.setItem('roadmap_checks', JSON.stringify(checks));
+  el.classList.toggle('checked');
+  el.innerHTML = checks[key] ? '✓' : '';
+  const textEl = el.nextElementSibling;
+  textEl.style.color = checks[key] ? 'var(--muted)' : '';
+  textEl.style.textDecoration = checks[key] ? 'line-through' : '';
+}
+
+// ============================================================
+// 공통 유틸
+// ============================================================
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function resetForm(ids) { ids.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; }); }
+
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('open'); });
+});
+
+// ============================================================
+// 앱 초기화
+// ============================================================
+async function initApp() {
+  document.getElementById('todayDate').textContent = new Date().toLocaleDateString('ko-KR');
+  // 로드맵은 API 없어도 항상 렌더
+  renderRoadmap();
+  loadedTabs.roadmap = true;
+
+  if (!checkSetup()) return;
+  const cfg = await apiGet('config');
+  CONFIG = cfg;
+  loadDashboard();
+  loadedTabs.dashboard = true;
+}
+
+initApp();
+</script>
+</body>
+</html>
