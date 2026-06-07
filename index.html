@@ -193,8 +193,32 @@ label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px
     <div class="tab-panel active" id="tab-dashboard">
       <div id="dash-loading" class="loading">데이터 불러오는 중...</div>
       <div id="dash-content" style="display:none">
+        <!-- 신뢰 카운터 배너 -->
+        <div id="trust-banner" style="display:flex;gap:0;background:#1a1d26;border:1px solid #2a2d3a;border-radius:8px;overflow:hidden;margin-bottom:10px;text-align:center;">
+          <div style="flex:1;padding:8px 4px;border-right:1px solid #2a2d3a;">
+            <div id="trust-inspected" style="font-size:20px;font-weight:700;color:#e8eaf0;">-</div>
+            <div style="font-size:10px;color:#6b7280;margin-top:2px;">검수완료</div>
+          </div>
+          <div style="flex:1;padding:8px 4px;border-right:1px solid #2a2d3a;">
+            <div id="trust-deals" style="font-size:20px;font-weight:700;color:#e8eaf0;">-</div>
+            <div style="font-size:10px;color:#6b7280;margin-top:2px;">거래완료</div>
+          </div>
+          <div style="flex:1;padding:8px 4px;border-right:1px solid #2a2d3a;">
+            <div id="trust-stored" style="font-size:20px;font-weight:700;color:#e8eaf0;">-</div>
+            <div style="font-size:10px;color:#6b7280;margin-top:2px;">보관중</div>
+          </div>
+          <div style="flex:1;padding:8px 4px;">
+            <div style="font-size:20px;font-weight:700;color:#10B981;">6개월</div>
+            <div style="font-size:10px;color:#6b7280;margin-top:2px;">보증</div>
+          </div>
+        </div>
         <div class="grid-4" id="dash-stats"></div>
         <div class="mt16" id="dash-alerts"></div>
+        <!-- CTA 배너 -->
+        <a href="#" id="cta-banner" style="display:block;margin-top:10px;padding:12px 16px;background:#F5C4B3;border-radius:8px;text-decoration:none;cursor:pointer;">
+          <div style="font-size:14px;font-weight:700;color:#7A2C00;">📸 사진 3장 + 모델명 DM → 24시간 내 견적!</div>
+          <div style="font-size:11px;color:#9A4520;margin-top:3px;">아이캠퍼 서울 공식 파트너 · 즉시 현금 · 구조변경 대행</div>
+        </a>
         <div class="card mt16" style="padding:12px 14px;">
           <div class="section-title" style="margin-bottom:10px">빠른 링크</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -350,6 +374,15 @@ label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px
       <input type="text" id="lead-model" placeholder="스카이캠프 2.0 / 미니 3.0 등">
     </div>
     <div id="purchase-extra">
+      <div class="form-group">
+        <label>매입 유형</label>
+        <div style="display:flex;gap:8px;margin-top:2px;">
+          <button type="button" id="btn-immediate" onclick="selectPurchaseType('즉시현금')" style="flex:1;padding:8px;border-radius:6px;border:2px solid var(--amber);background:var(--amber);color:#000;font-size:12px;font-weight:700;cursor:pointer;">즉시 현금 매입</button>
+          <button type="button" id="btn-consign" onclick="selectPurchaseType('위탁판매')" style="flex:1;padding:8px;border-radius:6px;border:2px solid var(--border);background:var(--border);color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;">위탁 판매</button>
+        </div>
+        <div id="consign-note" style="display:none;margin-top:6px;padding:8px;background:rgba(245,158,11,0.1);border-radius:6px;font-size:11px;color:var(--amber);">판매 후 수수료 15% 제외하고 정산. 보통 1~2개월 소요.</div>
+        <input type="hidden" id="lead-purchase-type" value="즉시현금">
+      </div>
       <div class="form-group">
         <label>사용기간</label>
         <input type="text" id="lead-usage" placeholder="2년 / 1년 6개월">
@@ -535,6 +568,11 @@ async function loadDashboard() {
   document.getElementById('dash-loading').style.display = 'none';
   document.getElementById('dash-content').style.display = 'block';
 
+  // 신뢰 카운터
+  document.getElementById('trust-inspected').textContent = c.inventory + '대';
+  document.getElementById('trust-deals').textContent = (data.purchaseFunnel?.find(f=>f.stage==='계약완료')?.count||0) + (data.salesFunnel?.find(f=>f.stage==='계약완료')?.count||0) + '건';
+  document.getElementById('trust-stored').textContent = c.inventory + '대';
+
   document.getElementById('dash-stats').innerHTML = `
     <div class="card stat-box">
       <div class="stat-num" style="color:var(--purchase)">${c.purchase}</div>
@@ -702,6 +740,18 @@ async function saveMemo(sheetName, id) {
 // ============================================================
 // DM 자동 파싱
 // ============================================================
+function selectPurchaseType(type) {
+  document.getElementById('lead-purchase-type').value = type;
+  const isConsign = type === '위탁판매';
+  document.getElementById('btn-immediate').style.background = isConsign ? 'var(--border)' : 'var(--amber)';
+  document.getElementById('btn-immediate').style.color = isConsign ? 'var(--muted)' : '#000';
+  document.getElementById('btn-immediate').style.borderColor = isConsign ? 'var(--border)' : 'var(--amber)';
+  document.getElementById('btn-consign').style.background = isConsign ? 'var(--amber)' : 'var(--border)';
+  document.getElementById('btn-consign').style.color = isConsign ? '#000' : 'var(--muted)';
+  document.getElementById('btn-consign').style.borderColor = isConsign ? 'var(--amber)' : 'var(--border)';
+  document.getElementById('consign-note').style.display = isConsign ? 'block' : 'none';
+}
+
 function switchLeadTab(tab) {
   const isDm = tab === 'dm';
   document.getElementById('dm-parse-section').style.display = isDm ? 'block' : 'none';
@@ -827,6 +877,7 @@ async function submitLead() {
   if (type === '매입') {
     data.usage = document.getElementById('lead-usage').value;
     data.grade = document.getElementById('lead-grade').value;
+    data.purchaseType = document.getElementById('lead-purchase-type').value;
     await apiPost({ action: 'addLead', type: '매입', data });
     loadedTabs.purchase = false;
     loadPipeline('매입');

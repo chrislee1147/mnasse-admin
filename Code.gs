@@ -229,7 +229,7 @@ function addLead(type, data) {
   const row = isPurchase
     ? [today, id, data.name, data.contact, data.channel,
        data.model || '', data.usage || '', data.grade || '미확인',
-       data.quote || '', '문의접수', '', data.memo || '', today]
+       data.quote || '', '문의접수', data.purchaseType || '즉시현금', '', data.memo || '', today]
     : [today, id, data.name, data.contact, data.channel,
        data.model || '', data.budget || '', data.carType || '',
        '문의접수', '', data.memo || '', today];
@@ -313,7 +313,7 @@ function setupAll() {
   const configs = [
     {
       name: SHEETS.PURCHASE,
-      headers: ['날짜','리드ID','이름','연락처','유입채널','RTT모델','사용기간','상태등급','견적가','파이프상태','DROP사유','메모','최종수정일'],
+      headers: ['날짜','리드ID','이름','연락처','유입채널','RTT모델','사용기간','상태등급','견적가','파이프상태','매입유형','DROP사유','메모','최종수정일'],
       color: '#E85D5D'
     },
     {
