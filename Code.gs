@@ -99,6 +99,10 @@ function generateId(prefix) {
   return prefix + '_' + Date.now();
 }
 
+function fmtDate(d) {
+  return Utilities.formatDate(d || new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+}
+
 function findRow(sheet, id, idCol) {
   idCol = idCol || '리드ID';
   const data = sheet.getDataRange().getValues();
@@ -219,16 +223,16 @@ function getConfig() {
 function addLead(type, data) {
   const isPurchase = type === '매입';
   const sheet = getSheet(isPurchase ? SHEETS.PURCHASE : SHEETS.SALES);
-  const now = new Date();
+  const today = fmtDate();
   const id = generateId(isPurchase ? 'P' : 'S');
 
   const row = isPurchase
-    ? [now, id, data.name, data.contact, data.channel,
+    ? [today, id, data.name, data.contact, data.channel,
        data.model || '', data.usage || '', data.grade || '미확인',
-       data.quote || '', '문의접수', '', data.memo || '', now]
-    : [now, id, data.name, data.contact, data.channel,
+       data.quote || '', '문의접수', '', data.memo || '', today]
+    : [today, id, data.name, data.contact, data.channel,
        data.model || '', data.budget || '', data.carType || '',
-       '문의접수', '', data.memo || '', now];
+       '문의접수', '', data.memo || '', today];
 
   sheet.appendRow(row);
   return { success: true, id };
@@ -242,7 +246,7 @@ function updateStatus(sheetName, id, status) {
   const statusCol   = getColIndex(sheet, '파이프상태');
   const modifiedCol = getColIndex(sheet, '최종수정일');
   if (statusCol > 0)   sheet.getRange(rowNum, statusCol).setValue(status);
-  if (modifiedCol > 0) sheet.getRange(rowNum, modifiedCol).setValue(new Date());
+  if (modifiedCol > 0) sheet.getRange(rowNum, modifiedCol).setValue(fmtDate());
   return { success: true };
 }
 
@@ -255,7 +259,7 @@ function updateField(sheetName, id, field, value, idColName) {
   if (col > 0) sheet.getRange(rowNum, col).setValue(value);
 
   const modifiedCol = getColIndex(sheet, '최종수정일');
-  if (modifiedCol > 0) sheet.getRange(rowNum, modifiedCol).setValue(new Date());
+  if (modifiedCol > 0) sheet.getRange(rowNum, modifiedCol).setValue(fmtDate());
   return { success: true };
 }
 

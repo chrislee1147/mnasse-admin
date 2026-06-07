@@ -297,6 +297,22 @@ label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px
       <span class="modal-title" id="lead-modal-title">리드 추가</span>
       <button class="modal-close" onclick="closeModal('lead-modal')">×</button>
     </div>
+    <!-- DM 파싱 탭 -->
+    <div style="display:flex;gap:0;margin-bottom:14px;border:1px solid var(--border);border-radius:6px;overflow:hidden;">
+      <button id="tab-manual" onclick="switchLeadTab('manual')" style="flex:1;padding:7px;background:var(--amber);color:#000;border:none;cursor:pointer;font-size:12px;font-weight:600;">직접 입력</button>
+      <button id="tab-dm" onclick="switchLeadTab('dm')" style="flex:1;padding:7px;background:var(--border);color:var(--muted);border:none;cursor:pointer;font-size:12px;font-weight:600;">DM 붙여넣기</button>
+    </div>
+    <!-- DM 파싱 섹션 -->
+    <div id="dm-parse-section" style="display:none;margin-bottom:14px;">
+      <div class="form-group">
+        <label>받은 DM / 문자 내용 전체 붙여넣기</label>
+        <textarea id="dm-raw-text" rows="5" placeholder="예시:&#10;안녕하세요 헬리오스 600 팔고싶은데요&#10;2년 사용했고 010-1234-5678 홍길동입니다&#10;150만원 정도 생각하고 있어요"></textarea>
+      </div>
+      <button class="btn btn-primary w100" onclick="parseDmText()">자동 파싱 →</button>
+      <div id="parse-result" style="display:none;margin-top:10px;padding:10px;background:rgba(16,185,129,0.1);border:1px solid var(--green);border-radius:6px;font-size:12px;color:var(--green);"></div>
+    </div>
+    <!-- 직접 입력 섹션 -->
+    <div id="manual-section">
     <div class="form-group">
       <label>유형</label>
       <select id="lead-type">
@@ -363,6 +379,7 @@ label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px
       <textarea id="lead-memo" rows="2" placeholder="받은 메시지 핵심 내용..."></textarea>
     </div>
     <button class="btn btn-primary w100" onclick="submitLead()">저장 → 시트 자동 반영</button>
+    </div><!-- end manual-section -->
   </div>
 </div>
 
@@ -680,6 +697,100 @@ async function saveMemo(sheetName, id) {
   const memo = document.getElementById('memo-edit').value;
   await apiPost({ action: 'updateField', sheet: sheetName, id, field: '메모', value: memo });
   closeModal('card-modal');
+}
+
+// ============================================================
+// DM 자동 파싱
+// ============================================================
+function switchLeadTab(tab) {
+  const isDm = tab === 'dm';
+  document.getElementById('dm-parse-section').style.display = isDm ? 'block' : 'none';
+  document.getElementById('manual-section').style.display = isDm ? 'none' : 'block';
+  document.getElementById('tab-dm').style.background = isDm ? 'var(--amber)' : 'var(--border)';
+  document.getElementById('tab-dm').style.color = isDm ? '#000' : 'var(--muted)';
+  document.getElementById('tab-manual').style.background = isDm ? 'var(--border)' : 'var(--amber)';
+  document.getElementById('tab-manual').style.color = isDm ? 'var(--muted)' : '#000';
+}
+
+function parseDmText() {
+  const raw = document.getElementById('dm-raw-text').value;
+  if (!raw.trim()) { alert('DM 내용을 붙여넣어 주세요.'); return; }
+
+  // 전화번호
+  const phoneMatch = raw.match(/01[0-9][-\s]?\d{3,4}[-\s]?\d{4}/);
+  const phone = phoneMatch ? phoneMatch[0].replace(/\s/g, '') : '';
+
+  // 이름: 한글 2~4글자 독립 단어
+  const nameMatch = raw.match(/([가-힣]{2,4})(?=\s*(입니다|이에요|이고|예요|이요|님))/);
+  const name = nameMatch ? nameMatch[1] : '';
+
+  // RTT 모델 키워드 매핑
+  const modelMap = [
+    ['헬리오스 600', /헬리오스\s*600/i],
+    ['헬리오스 400', /헬리오스\s*400/i],
+    ['헬리오스', /헬리오스/i],
+    ['스카이캠프 2.0', /스카이캠프\s*2/i],
+    ['스카이캠프 미니', /스카이캠프\s*미니/i],
+    ['스카이캠프', /스카이캠프/i],
+    ['팝업 2.0', /팝업\s*2/i],
+    ['팝업', /팝업/i],
+    ['미니 3.0', /미니\s*3/i],
+    ['미니', /미니/i],
+  ];
+  let model = '';
+  for (const [label, re] of modelMap) {
+    if (re.test(raw)) { model = label; break; }
+  }
+
+  // 예산: "150만", "150만원", "150"
+  const budgetMatch = raw.match(/(\d{2,4})\s*만\s*원?/);
+  const budget = budgetMatch ? budgetMatch[1] + '만원' : '';
+
+  // 사용기간
+  const usageMatch = raw.match(/(\d+)\s*년\s*(\d+\s*개월)?|\d+개월/);
+  const usage = usageMatch ? usageMatch[0] : '';
+
+  // 판매/구매 의도 감지
+  const isSell = /팔|판매|매도|처분|내놓|넘기/.test(raw);
+  const isBuy  = /사고|구매|구입|사려|원하|찾고/.test(raw);
+  const type   = isSell ? '매입' : (isBuy ? '매출' : '매입');
+
+  // 채널 감지
+  let channel = '기타';
+  if (/인스타|instagram/i.test(raw)) channel = '인스타DM';
+  else if (/카카오/i.test(raw)) channel = '카카오DM';
+  else if (/번개/i.test(raw)) channel = '번개장터';
+  else if (/당근/i.test(raw)) channel = '당근마켓';
+  else if (/카페|네이버/i.test(raw)) channel = '네이버카페';
+  else if (/문자|sms/i.test(raw)) channel = '문자';
+
+  // 폼에 값 채우기
+  document.getElementById('lead-type').value = type;
+  toggleLeadExtras();
+  if (name) document.getElementById('lead-name').value = name;
+  if (phone) document.getElementById('lead-contact').value = phone;
+  document.getElementById('lead-channel').value = channel;
+  if (model) document.getElementById('lead-model').value = model;
+  if (usage) document.getElementById('lead-usage').value = usage;
+  if (budget) document.getElementById('lead-budget').value = budget;
+  document.getElementById('lead-memo').value = raw.substring(0, 200);
+
+  // 결과 표시
+  const parsed = [
+    name    ? `이름: ${name}`    : '이름: 미감지 (직접 입력)',
+    phone   ? `연락처: ${phone}` : '연락처: 미감지 (직접 입력)',
+    model   ? `모델: ${model}`   : '모델: 미감지',
+    `유형: ${type} | 채널: ${channel}`,
+    budget  ? `예산: ${budget}`  : '',
+    usage   ? `사용기간: ${usage}` : '',
+  ].filter(Boolean).join('\n');
+
+  const resultEl = document.getElementById('parse-result');
+  resultEl.style.display = 'block';
+  resultEl.innerHTML = '✅ 파싱 완료<br>' + parsed.replace(/\n/g, '<br>') + '<br><br>아래에서 확인 후 저장하세요.';
+
+  // 직접 입력 탭으로 전환
+  switchLeadTab('manual');
 }
 
 // ============================================================
