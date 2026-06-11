@@ -165,6 +165,47 @@ label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px
 
 /* ── 퀵 리드 입력 ── */
 .fab { position: fixed; bottom: 20px; right: 20px; width: 52px; height: 52px; border-radius: 50%; background: var(--amber); color: #000; border: none; font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 16px rgba(245,158,11,0.4); z-index: 50; }
+
+/* ── 포스팅 승인 ── */
+/* Instagram-style post preview */
+.approval-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 18px; max-width: 480px; margin-left: auto; margin-right: auto; }
+.approval-card.done { opacity: 0.4; pointer-events: none; }
+
+/* 프로필 헤더 */
+.ig-header { display: flex; align-items: center; gap: 10px; padding: 10px 12px; }
+.ig-avatar { width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #fff; flex-shrink: 0; }
+.ig-handle { font-size: 13px; font-weight: 700; color: var(--text); }
+.ig-subtitle { font-size: 11px; color: var(--muted); }
+.ig-more { margin-left: auto; color: var(--muted); font-size: 20px; line-height: 1; }
+
+/* 이미지 영역 */
+.ig-img-wrap { width: 100%; aspect-ratio: 1 / 1; background: var(--bg); position: relative; overflow: hidden; }
+.ig-img-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ig-img-placeholder { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--muted); font-size: 12px; }
+.ig-carousel-dots { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 5px; }
+.ig-dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.45); }
+.ig-dot.active { background: #3897f0; width: 8px; height: 8px; }
+.ig-media-tag { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.55); border-radius: 6px; padding: 3px 8px; font-size: 11px; color: #fff; font-weight: 600; backdrop-filter: blur(4px); }
+
+/* 캡션 + 해시태그 */
+.ig-body { padding: 10px 12px 4px; }
+.ig-caption-wrap { font-size: 13px; line-height: 1.65; color: var(--text); max-height: 120px; overflow-y: auto; margin-bottom: 6px; }
+.ig-caption-wrap .ig-username { font-weight: 700; margin-right: 6px; }
+.ig-hashtags { font-size: 12px; color: #4A90D9; line-height: 1.6; word-break: break-word; margin-bottom: 8px; }
+.ig-date { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 10px; }
+
+/* 승인/거절 버튼 */
+.ig-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border-top: 1px solid var(--border); }
+.ig-btn { padding: 13px; border: none; background: none; cursor: pointer; font-size: 13px; font-weight: 700; transition: background 0.15s; }
+.ig-btn-approve { color: var(--green); border-right: 1px solid var(--border); }
+.ig-btn-approve:hover { background: rgba(16,185,129,0.08); }
+.ig-btn-reject { color: var(--red); }
+.ig-btn-reject:hover { background: rgba(239,68,68,0.08); }
+.ig-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.ig-done-msg { text-align: center; padding: 13px; font-size: 13px; font-weight: 600; grid-column: span 2; border-top: 1px solid var(--border); }
+
+/* 승인 탭 뱃지 */
+.approval-badge { display: inline-flex; align-items: center; justify-content: center; background: var(--red); color: #fff; border-radius: 10px; font-size: 10px; font-weight: 700; min-width: 16px; height: 16px; padding: 0 4px; margin-left: 5px; vertical-align: middle; line-height: 1; }
 </style>
 </head>
 <body>
@@ -184,6 +225,7 @@ label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px
     <button class="tab-btn" data-tab="content">콘텐츠</button>
     <button class="tab-btn" data-tab="funnel">퍼널 분석</button>
     <button class="tab-btn" data-tab="roadmap">로드맵</button>
+    <button class="tab-btn" data-tab="approval">포스팅 승인<span class="approval-badge" id="approval-badge" style="display:none"></span></button>
   </nav>
 
   <!-- 메인 -->
@@ -306,6 +348,20 @@ label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px
       <div class="card" style="margin-top:8px">
         <div class="roadmap" id="roadmap-content"></div>
       </div>
+    </div>
+
+    <!-- ── 포스팅 승인 ── -->
+    <div class="tab-panel" id="tab-approval">
+      <div class="flex items-center gap8 mt8" style="margin-bottom:14px">
+        <span class="section-title" style="margin:0">포스팅 승인 대기</span>
+        <button class="btn btn-ghost btn-sm ml-auto" onclick="loadApproval(true)">새로고침</button>
+      </div>
+      <div id="approval-loading" class="loading" style="display:none">불러오는 중...</div>
+      <div id="approval-empty" class="empty" style="display:none">
+        대기 중인 포스팅이 없습니다<br>
+        <span style="font-size:11px;margin-top:6px;display:block">inbox/ 에 파일을 투입하면 여기에 표시됩니다</span>
+      </div>
+      <div id="approval-list"></div>
     </div>
 
   </main>
@@ -543,8 +599,8 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 });
 
 function loadTab(tab) {
-  // 로드맵은 API 없어도 렌더링
   if (tab === 'roadmap') { renderRoadmap(); return; }
+  if (tab === 'approval') { loadApproval(); return; }
   if (!checkSetup()) return;
   switch (tab) {
     case 'purchase':  loadPipeline('매입'); break;
@@ -1124,6 +1180,209 @@ function toggleCheck(key, el) {
   const textEl = el.nextElementSibling;
   textEl.style.color = checks[key] ? 'var(--muted)' : '';
   textEl.style.textDecoration = checks[key] ? 'line-through' : '';
+}
+
+// ============================================================
+// 포스팅 승인
+// ============================================================
+let _approvalPollTimer = null;
+
+async function loadApproval(manual) {
+  if (!checkSetup()) return;
+
+  const listEl    = document.getElementById('approval-list');
+  const loadingEl = document.getElementById('approval-loading');
+  const emptyEl   = document.getElementById('approval-empty');
+
+  loadingEl.style.display = 'block';
+  listEl.innerHTML = '';
+  emptyEl.style.display = 'none';
+
+  let items = [];
+  try {
+    const res = await apiGet('getApproval');
+    items = Array.isArray(res) ? res : [];
+  } catch(e) {
+    loadingEl.style.display = 'none';
+    listEl.innerHTML = `<div class="alert alert-danger">GAS 연결 실패: ${e.message}<br><small>SHEET_API_URL 설정 확인 후 새로고침</small></div>`;
+    return;
+  }
+
+  loadingEl.style.display = 'none';
+
+  const ready = items.filter(i => i.status === 'ready');
+  _updateApprovalBadge(ready.length);
+
+  if (ready.length === 0) {
+    emptyEl.style.display = 'block';
+  } else {
+    listEl.innerHTML = ready.map(renderApprovalCard).join('');
+  }
+
+  // 자동 폴링 30초
+  clearTimeout(_approvalPollTimer);
+  _approvalPollTimer = setTimeout(() => {
+    const approvalPanel = document.getElementById('tab-approval');
+    if (approvalPanel && approvalPanel.classList.contains('active')) loadApproval();
+  }, 30000);
+}
+
+function renderApprovalCard(item) {
+  const stem = item.stem || '';
+  const mediaType = item.media_type || '';
+  const folderType = item.folder_type || '';
+
+  const mediaLabel = { carousel:'캐러셀', image:'사진', video:'릴스' }[mediaType] || mediaType;
+  const cardCount  = mediaType === 'carousel' ? 4 : 1;
+
+  // 이미지 영역
+  let imgHtml;
+  if (item.thumbnail) {
+    imgHtml = `<img src="data:image/jpeg;base64,${item.thumbnail}" alt="미리보기" onerror="this.parentElement.innerHTML='<div class=ig-img-placeholder><span style=font-size:28px;opacity:.3>□</span><span>이미지 미리보기 없음</span></div>'">`;
+  } else {
+    const icon = { carousel:'⬛⬛⬛⬛', image:'□', video:'▷' }[mediaType] || '□';
+    imgHtml = `<div class="ig-img-placeholder"><span style="font-size:32px;opacity:.25">${icon}</span><span>${mediaLabel} 준비됨</span></div>`;
+  }
+
+  // 캐러셀 도트
+  let dotsHtml = '';
+  if (mediaType === 'carousel') {
+    dotsHtml = `<div class="ig-carousel-dots">${Array(cardCount).fill(0).map((_, i) =>
+      `<div class="ig-dot${i === 0 ? ' active' : ''}"></div>`).join('')}</div>`;
+  }
+
+  // 미디어 태그
+  const mediaTagMap = { carousel:`1 / ${cardCount}`, image:'사진', video:'릴스' };
+  const mediaTag = `<div class="ig-media-tag">${mediaTagMap[mediaType] || mediaType}</div>`;
+
+  // 캡션 파싱 — 해시태그 분리
+  const fullCaption = item.caption || '';
+  const sepIdx = fullCaption.lastIndexOf('\n.\n.\n.');
+  const captionText  = sepIdx > 0 ? fullCaption.slice(0, sepIdx).trim() : fullCaption.trim();
+  const hashtagText  = sepIdx > 0 ? fullCaption.slice(sepIdx + 6).trim() : '';
+
+  // 날짜
+  const dateStr = item['날짜'] || item.date || '';
+
+  return `
+    <div class="approval-card" id="acard-${stem}">
+      <!-- IG 헤더 -->
+      <div class="ig-header">
+        <div class="ig-avatar">R</div>
+        <div>
+          <div class="ig-handle">rtt_player</div>
+          <div class="ig-subtitle">${{ product:'제품 입고', work:'현장 작업', video:'릴스 영상' }[folderType] || folderType}</div>
+        </div>
+        <div class="ig-more">···</div>
+      </div>
+
+      <!-- 이미지 -->
+      <div class="ig-img-wrap">
+        ${imgHtml}
+        ${dotsHtml}
+        ${mediaTag}
+      </div>
+
+      <!-- 캡션 + 해시태그 -->
+      <div class="ig-body">
+        <div class="ig-caption-wrap">
+          <span class="ig-username">rtt_player</span>${escHtml(captionText)}
+        </div>
+        ${hashtagText ? `<div class="ig-hashtags">${escHtml(hashtagText)}</div>` : ''}
+        ${dateStr ? `<div class="ig-date">${dateStr}</div>` : ''}
+      </div>
+
+      <!-- 버튼 -->
+      <div class="ig-actions" id="aactions-${stem}">
+        <button class="ig-btn ig-btn-approve" onclick="approvePost('${stem}',this)">승인 — 포스팅</button>
+        <button class="ig-btn ig-btn-reject"  onclick="rejectPost('${stem}',this)">거절</button>
+      </div>
+    </div>`;
+}
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/\n/g,'<br>');
+}
+
+async function approvePost(stem, btn) {
+  btn.disabled = true;
+  const siblingBtn = btn.parentElement.querySelector('.ig-btn-reject');
+  if (siblingBtn) siblingBtn.disabled = true;
+  btn.textContent = '처리 중...';
+
+  try {
+    const res = await apiPost({ action: 'approveContent', stem });
+    if (!res.error) {
+      document.getElementById('aactions-' + stem).innerHTML =
+        `<div class="ig-done-msg" style="color:var(--green)">승인 완료 — 포스팅 처리 중 (최대 15초)</div>`;
+      document.getElementById('acard-' + stem).classList.add('done');
+      _updateApprovalBadge(-1);
+    } else {
+      alert('오류: ' + res.error);
+      btn.disabled = false;
+      if (siblingBtn) siblingBtn.disabled = false;
+      btn.textContent = '승인 — 포스팅';
+    }
+  } catch(e) {
+    alert('요청 실패: ' + e.message);
+    btn.disabled = false;
+    if (siblingBtn) siblingBtn.disabled = false;
+    btn.textContent = '승인 — 포스팅';
+  }
+}
+
+async function rejectPost(stem, btn) {
+  if (!confirm('이 포스팅을 거절하겠습니까?\n파일은 done/ 폴더로 이동됩니다.')) return;
+  btn.disabled = true;
+  const siblingBtn = btn.parentElement.querySelector('.ig-btn-approve');
+  if (siblingBtn) siblingBtn.disabled = true;
+  btn.textContent = '처리 중...';
+
+  try {
+    const res = await apiPost({ action: 'rejectContent', stem });
+    if (!res.error) {
+      document.getElementById('aactions-' + stem).innerHTML =
+        `<div class="ig-done-msg" style="color:var(--red)">거절됨 — done/ 이동 처리 중</div>`;
+      document.getElementById('acard-' + stem).classList.add('done');
+      _updateApprovalBadge(-1);
+    } else {
+      alert('오류: ' + res.error);
+      btn.disabled = false;
+      if (siblingBtn) siblingBtn.disabled = false;
+      btn.textContent = '거절';
+    }
+  } catch(e) {
+    alert('요청 실패: ' + e.message);
+    btn.disabled = false;
+    if (siblingBtn) siblingBtn.disabled = false;
+    btn.textContent = '거절';
+  }
+}
+
+function _updateApprovalBadge(delta) {
+  const badge = document.getElementById('approval-badge');
+  if (!badge) return;
+  const cur = parseInt(badge.textContent) || 0;
+  const next = typeof delta === 'number' ? cur + delta : delta;
+  if (next <= 0) { badge.style.display = 'none'; }
+  else { badge.textContent = next; badge.style.display = 'inline-flex'; }
+}
+
+// 백그라운드 뱃지 폴링 (60초 간격, 어느 탭에 있든)
+setInterval(async () => {
+  if (!_gas_url_cached()) return;
+  try {
+    const res = await apiGet('getApproval');
+    if (Array.isArray(res)) {
+      _updateApprovalBadge(res.filter(i => i.status === 'ready').length);
+    }
+  } catch(e) {}
+}, 60000);
+
+function _gas_url_cached() {
+  return localStorage.getItem('mnasse_script_url') || '';
 }
 
 // ============================================================

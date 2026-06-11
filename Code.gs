@@ -10,7 +10,8 @@ const SHEETS = {
   INVENTORY: '재고',
   CONTENT: '콘텐츠_트래커',
   WAITLIST: '대기리스트',
-  KPI: 'KPI_일별'
+  KPI: 'KPI_일별',
+  APPROVAL: '포스팅_승인큐'
 };
 
 const PURCHASE_STAGES = ['문의접수', '견적발송', '협의중', '계약완료', '입고완료', '검수완료', '재고등록', 'DROP'];
@@ -45,10 +46,11 @@ function handleGet(params) {
       case 'pipeline':   return getPipeline(params.type);
       case 'inventory':  return getInventory();
       case 'content':    return getContent();
-      case 'waitlist':   return getWaitlist();
-      case 'kpi':        return getKPI();
-      case 'config':     return getConfig();
-      default:           return { error: '알 수 없는 액션: ' + params.action };
+      case 'waitlist':    return getWaitlist();
+      case 'kpi':         return getKPI();
+      case 'config':      return getConfig();
+      case 'getApproval': return getApprovalQueue();
+      default:            return { error: '알 수 없는 액션: ' + params.action };
     }
   } catch (e) {
     return { error: e.message };
@@ -67,6 +69,11 @@ function handlePost(body) {
       case 'addWaitlist':     return addWaitlist(body.data);
       case 'updateWaitlist':  return updateField(SHEETS.WAITLIST, body.id, body.field, body.value, '이름');
       case 'addKPI':          return addKPI(body.data);
+      case 'addApproval':     return addApproval(body.data);
+      case 'approveContent':  return setApprovalStatus(body.stem, 'approved');
+      case 'rejectContent':   return setApprovalStatus(body.stem, 'rejected');
+      case 'markPosted':      return markPosted(body.stem, body.postId);
+      case 'markRejectedDone':return setApprovalStatus(body.stem, 'rejected_done');
       default:                return { error: '알 수 없는 액션: ' + body.action };
     }
   } catch (e) {
@@ -304,6 +311,83 @@ function addKPI(data) {
 }
 
 // ============================================================
+// 포스팅 승인 큐
+// ============================================================
+
+function getApprovalQueue() {
+  const sheet = getSheet(SHEETS.APPROVAL);
+  if (!sheet) return [];
+  const items = sheetToObjects(sheet);
+  // ready 항목만 반환 (thumbnail은 용량 절약 위해 포함)
+  return items.filter(r => r['status'] === 'ready');
+}
+
+function addApproval(data) {
+  const sheet = getSheet(SHEETS.APPROVAL);
+  if (!sheet) return { error: '포스팅_승인큐 시트 없음 — setupApprovalSheet() 실행 필요' };
+  sheet.appendRow([
+    data.date    || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'),
+    data.stem        || '',
+    data.media_type  || '',
+    data.folder_type || '',
+    data.file        || '',
+    data.caption     || '',
+    data.thumbnail   || '',
+    'ready',
+    '',   // post_id
+    ''    // processed_at
+  ]);
+  return { success: true };
+}
+
+function setApprovalStatus(stem, status) {
+  const sheet = getSheet(SHEETS.APPROVAL);
+  if (!sheet) return { error: '포스팅_승인큐 시트 없음' };
+  const rowNum = _findApprovalRow(sheet, stem);
+  if (rowNum < 0) return { error: 'stem 없음: ' + stem };
+
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const statusCol      = headers.indexOf('status') + 1;
+  const processedAtCol = headers.indexOf('processed_at') + 1;
+
+  if (statusCol > 0) sheet.getRange(rowNum, statusCol).setValue(status);
+  if (processedAtCol > 0) {
+    sheet.getRange(rowNum, processedAtCol)
+         .setValue(Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'));
+  }
+  return { success: true };
+}
+
+function markPosted(stem, postId) {
+  const sheet = getSheet(SHEETS.APPROVAL);
+  if (!sheet) return { error: '포스팅_승인큐 시트 없음' };
+  const rowNum = _findApprovalRow(sheet, stem);
+  if (rowNum < 0) return { error: 'stem 없음: ' + stem };
+
+  const headers    = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const statusCol  = headers.indexOf('status') + 1;
+  const postIdCol  = headers.indexOf('post_id') + 1;
+  const procCol    = headers.indexOf('processed_at') + 1;
+
+  if (statusCol > 0) sheet.getRange(rowNum, statusCol).setValue('posted');
+  if (postIdCol > 0) sheet.getRange(rowNum, postIdCol).setValue(postId || '');
+  if (procCol   > 0) sheet.getRange(rowNum, procCol).setValue(
+    Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'));
+  return { success: true };
+}
+
+function _findApprovalRow(sheet, stem) {
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const stemIdx = headers.indexOf('stem');
+  if (stemIdx < 0) return -1;
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][stemIdx]) === String(stem)) return i + 1;
+  }
+  return -1;
+}
+
+// ============================================================
 // 최초 세팅 — 스크립트 에디터에서 직접 실행
 // ============================================================
 
@@ -340,6 +424,11 @@ function setupAll() {
       name: SHEETS.KPI,
       headers: ['날짜','매입문의','매출문의','대기리스트신규','인스타팔로워','인스타DM수','블로그방문','카페조회','매입전환','매출전환'],
       color: '#7B5EA7'
+    },
+    {
+      name: SHEETS.APPROVAL,
+      headers: ['날짜','stem','media_type','folder_type','file','caption','thumbnail','status','post_id','processed_at'],
+      color: '#8B5CF6'
     }
   ];
 
