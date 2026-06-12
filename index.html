@@ -352,14 +352,67 @@ label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px
 
     <!-- ── 포스팅 승인 ── -->
     <div class="tab-panel" id="tab-approval">
-      <div class="flex items-center gap8 mt8" style="margin-bottom:14px">
-        <span class="section-title" style="margin:0">포스팅 승인 대기</span>
+
+      <!-- 콘텐츠 생성 -->
+      <div class="card mt8" style="margin-bottom:14px;border-color:#E74C3C33">
+        <div class="section-title" style="color:#E74C3C;margin-bottom:10px">콘텐츠 생성</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:10px">inbox 폴더의 이미지를 처리해 카드뉴스·캡션을 자동 생성합니다</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-sm" style="background:#E74C3C;color:#fff" onclick="triggerGenerate('2_work')">현장 작업 처리</button>
+          <button class="btn btn-sm" style="background:#E74C3C;color:#fff" onclick="triggerGenerate('1_product')">제품 카드뉴스</button>
+          <button class="btn btn-sm" style="background:#E74C3C;color:#fff" onclick="triggerGenerate('3_video')">영상(릴스) 처리</button>
+          <button class="btn btn-sm" style="background:#4A4A6A;color:#fff" onclick="triggerGenerate('all')">전체 처리</button>
+        </div>
+        <div id="trigger-status" style="margin-top:8px;font-size:12px;display:none"></div>
+      </div>
+
+      <!-- 스케줄 설정 -->
+      <div class="card" style="margin-bottom:14px;border-color:#F9CA2433">
+        <div class="flex items-center gap8" style="margin-bottom:10px">
+          <span class="section-title" style="color:#F9CA24;margin:0">자동 포스팅 스케줄</span>
+          <label style="display:flex;align-items:center;gap:6px;margin-left:auto;color:var(--text);font-size:12px;cursor:pointer">
+            <input type="checkbox" id="schedule-active" onchange="saveSchedule()" style="width:auto">
+            활성화
+          </label>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+          <div>
+            <label>포스팅 시간</label>
+            <input type="time" id="schedule-time" value="10:00" onchange="saveSchedule()" style="width:100px">
+          </div>
+          <div>
+            <label>반복</label>
+            <select id="schedule-type" onchange="saveSchedule()" style="width:100px">
+              <option value="매일">매일</option>
+              <option value="주2회">주 2회</option>
+              <option value="주3회">주 3회</option>
+              <option value="주5회">주 5회</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-bottom:6px">
+          <label>요일 선택</label>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px" id="schedule-days">
+            <label style="display:flex;align-items:center;gap:3px;cursor:pointer"><input type="checkbox" value="월" onchange="saveSchedule()" style="width:auto"> 월</label>
+            <label style="display:flex;align-items:center;gap:3px;cursor:pointer"><input type="checkbox" value="화" onchange="saveSchedule()" style="width:auto"> 화</label>
+            <label style="display:flex;align-items:center;gap:3px;cursor:pointer"><input type="checkbox" value="수" onchange="saveSchedule()" style="width:auto"> 수</label>
+            <label style="display:flex;align-items:center;gap:3px;cursor:pointer"><input type="checkbox" value="목" onchange="saveSchedule()" style="width:auto"> 목</label>
+            <label style="display:flex;align-items:center;gap:3px;cursor:pointer"><input type="checkbox" value="금" onchange="saveSchedule()" style="width:auto"> 금</label>
+            <label style="display:flex;align-items:center;gap:3px;cursor:pointer"><input type="checkbox" value="토" onchange="saveSchedule()" style="width:auto"> 토</label>
+            <label style="display:flex;align-items:center;gap:3px;cursor:pointer"><input type="checkbox" value="일" onchange="saveSchedule()" style="width:auto"> 일</label>
+          </div>
+        </div>
+        <div id="schedule-status" style="font-size:11px;color:var(--muted)">저장됨</div>
+      </div>
+
+      <div class="flex items-center gap8" style="margin-bottom:14px">
+        <span class="section-title" style="margin:0">승인 대기</span>
         <button class="btn btn-ghost btn-sm ml-auto" onclick="loadApproval(true)">새로고침</button>
       </div>
       <div id="approval-loading" class="loading" style="display:none">불러오는 중...</div>
       <div id="approval-empty" class="empty" style="display:none">
         대기 중인 포스팅이 없습니다<br>
-        <span style="font-size:11px;margin-top:6px;display:block">inbox/ 에 파일을 투입하면 여기에 표시됩니다</span>
+        <span style="font-size:11px;margin-top:6px;display:block">위 버튼으로 생성하거나 inbox/ 에 파일을 넣고 처리하세요</span>
       </div>
       <div id="approval-list"></div>
     </div>
@@ -600,7 +653,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 
 function loadTab(tab) {
   if (tab === 'roadmap') { renderRoadmap(); return; }
-  if (tab === 'approval') { loadApproval(); return; }
+  if (tab === 'approval') { loadApproval(); loadSchedule(); return; }
   if (!checkSetup()) return;
   switch (tab) {
     case 'purchase':  loadPipeline('매입'); break;
@@ -1180,6 +1233,59 @@ function toggleCheck(key, el) {
   const textEl = el.nextElementSibling;
   textEl.style.color = checks[key] ? 'var(--muted)' : '';
   textEl.style.textDecoration = checks[key] ? 'line-through' : '';
+}
+
+// ============================================================
+// 콘텐츠 생성 트리거
+// ============================================================
+async function triggerGenerate(folder) {
+  const statusEl = document.getElementById('trigger-status');
+  statusEl.style.display = 'block';
+  statusEl.style.color = '#F9CA24';
+  statusEl.textContent = `${folder === 'all' ? '전체' : folder} 처리 중... (watch.py가 실행 중이어야 합니다)`;
+  try {
+    await gasPost({ action: 'setProcessTrigger', folder });
+    statusEl.style.color = '#10B981';
+    statusEl.textContent = `트리거 전송 완료 — watch.py가 최대 15초 내 처리합니다`;
+    setTimeout(() => loadApproval(true), 16000);
+  } catch(e) {
+    statusEl.style.color = '#EF4444';
+    statusEl.textContent = '실패: ' + e.message;
+  }
+}
+
+// ============================================================
+// 스케줄 설정
+// ============================================================
+async function loadSchedule() {
+  try {
+    const data = await gasGet({ action: 'getScheduleSettings' });
+    document.getElementById('schedule-active').checked = !!data.active;
+    document.getElementById('schedule-time').value = data.time || '10:00';
+    document.getElementById('schedule-type').value = data.type || '매일';
+    const days = data.days || [];
+    document.querySelectorAll('#schedule-days input[type=checkbox]').forEach(cb => {
+      cb.checked = days.includes(cb.value);
+    });
+    document.getElementById('schedule-status').textContent = '저장됨';
+  } catch(e) {}
+}
+
+async function saveSchedule() {
+  const active = document.getElementById('schedule-active').checked;
+  const time   = document.getElementById('schedule-time').value;
+  const type   = document.getElementById('schedule-type').value;
+  const days   = [...document.querySelectorAll('#schedule-days input[type=checkbox]:checked')].map(c => c.value);
+  const statusEl = document.getElementById('schedule-status');
+  statusEl.textContent = '저장 중...';
+  try {
+    await gasPost({ action: 'saveScheduleSettings', data: { active, time, type, days } });
+    statusEl.textContent = `저장됨 — ${active ? `${days.join('·')} ${time} 자동 포스팅` : '비활성'}`;
+    statusEl.style.color = active ? '#10B981' : 'var(--muted)';
+  } catch(e) {
+    statusEl.textContent = '저장 실패';
+    statusEl.style.color = '#EF4444';
+  }
 }
 
 // ============================================================

@@ -49,8 +49,14 @@ function handleGet(params) {
       case 'waitlist':    return getWaitlist();
       case 'kpi':         return getKPI();
       case 'config':      return getConfig();
-      case 'getApproval': return getApprovalQueue();
-      default:            return { error: '알 수 없는 액션: ' + params.action };
+      case 'getApproval':          return getApprovalQueue();
+      case 'getPendingActions':    return getPendingActions();
+      case 'cleanupDuplicates':    return cleanupDuplicates();
+      case 'setupApprovalSheet':   return setupApprovalSheet();
+      case 'getProcessTrigger':    return getProcessTrigger();
+      case 'clearProcessTrigger':  return clearProcessTrigger();
+      case 'getScheduleSettings':  return getScheduleSettings();
+      default:                   return { error: '알 수 없는 액션: ' + params.action };
     }
   } catch (e) {
     return { error: e.message };
@@ -72,9 +78,11 @@ function handlePost(body) {
       case 'addApproval':     return addApproval(body.data);
       case 'approveContent':  return setApprovalStatus(body.stem, 'approved');
       case 'rejectContent':   return setApprovalStatus(body.stem, 'rejected');
-      case 'markPosted':      return markPosted(body.stem, body.postId);
-      case 'markRejectedDone':return setApprovalStatus(body.stem, 'rejected_done');
-      default:                return { error: '알 수 없는 액션: ' + body.action };
+      case 'markPosted':          return markPosted(body.stem, body.postId);
+      case 'markRejectedDone':    return setApprovalStatus(body.stem, 'rejected_done');
+      case 'setProcessTrigger':   return setProcessTrigger(body.folder);
+      case 'saveScheduleSettings':return saveScheduleSettings(body.data);
+      default:                    return { error: '알 수 없는 액션: ' + body.action };
     }
   } catch (e) {
     return { error: e.message };
@@ -314,6 +322,20 @@ function addKPI(data) {
 // 포스팅 승인 큐
 // ============================================================
 
+function setupApprovalSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(SHEETS.APPROVAL);
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEETS.APPROVAL);
+    const headers = ['날짜','stem','media_type','folder_type','file','caption','thumbnail','status','post_id','processed_at'];
+    const hRange = sheet.getRange(1, 1, 1, headers.length);
+    hRange.setValues([headers]).setBackground('#8B5CF6').setFontWeight('bold').setFontColor('#FFFFFF');
+    sheet.setFrozenRows(1);
+    sheet.autoResizeColumns(1, headers.length);
+  }
+  return { success: true, sheet: SHEETS.APPROVAL };
+}
+
 function getApprovalQueue() {
   const sheet = getSheet(SHEETS.APPROVAL);
   if (!sheet) return [];
@@ -322,9 +344,48 @@ function getApprovalQueue() {
   return items.filter(r => r['status'] === 'ready');
 }
 
+function cleanupDuplicates() {
+  const sheet = getSheet(SHEETS.APPROVAL);
+  if (!sheet) return { error: '시트 없음' };
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const stemIdx = headers.indexOf('stem');
+  const statusIdx = headers.indexOf('status');
+  const seen = {};
+  const toDelete = [];
+  for (let i = 1; i < data.length; i++) {
+    const stem = String(data[i][stemIdx]);
+    const status = data[i][statusIdx];
+    if (seen[stem] !== undefined) {
+      // 중복: ready 상태인 오래된 행 삭제 (비-ready 우선 유지)
+      if (status === 'ready') toDelete.push(i + 1);
+      else if (seen[stem] === 'ready') toDelete.push(seen[stem + '_row']);
+    } else {
+      seen[stem] = status;
+      seen[stem + '_row'] = i + 1;
+    }
+  }
+  for (let i = toDelete.length - 1; i >= 0; i--) {
+    sheet.deleteRow(toDelete[i]);
+  }
+  return { success: true, deleted: toDelete.length };
+}
+
+function getPendingActions() {
+  const sheet = getSheet(SHEETS.APPROVAL);
+  if (!sheet) return [];
+  const items = sheetToObjects(sheet);
+  return items.filter(r => r['status'] === 'approved' || r['status'] === 'rejected');
+}
+
 function addApproval(data) {
   const sheet = getSheet(SHEETS.APPROVAL);
   if (!sheet) return { error: '포스팅_승인큐 시트 없음 — setupApprovalSheet() 실행 필요' };
+
+  // 같은 stem이 이미 있으면 추가하지 않음 (중복 방지)
+  const existing = _findApprovalRow(sheet, data.stem);
+  if (existing > 0) return { success: true, skipped: true };
+
   sheet.appendRow([
     data.date    || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'),
     data.stem        || '',
@@ -385,6 +446,48 @@ function _findApprovalRow(sheet, stem) {
     if (String(data[i][stemIdx]) === String(stem)) return i + 1;
   }
   return -1;
+}
+
+// ============================================================
+// 콘텐츠 생성 트리거 (어드민 → Python)
+// ============================================================
+
+function setProcessTrigger(folder) {
+  PropertiesService.getScriptProperties().setProperties({
+    'PROCESS_TRIGGER_FOLDER': folder || 'all',
+    'PROCESS_TRIGGER_TIME':   String(Date.now()),
+    'PROCESS_TRIGGER_DONE':   'false'
+  });
+  return { success: true, folder: folder };
+}
+
+function getProcessTrigger() {
+  const p = PropertiesService.getScriptProperties();
+  const done   = p.getProperty('PROCESS_TRIGGER_DONE');
+  const folder = p.getProperty('PROCESS_TRIGGER_FOLDER');
+  const ts     = p.getProperty('PROCESS_TRIGGER_TIME');
+  if (!folder || done === 'true') return { pending: false };
+  return { pending: true, folder: folder, ts: ts };
+}
+
+function clearProcessTrigger() {
+  PropertiesService.getScriptProperties().setProperty('PROCESS_TRIGGER_DONE', 'true');
+  return { success: true };
+}
+
+// ============================================================
+// 스케줄 설정
+// ============================================================
+
+function getScheduleSettings() {
+  const raw = PropertiesService.getScriptProperties().getProperty('SCHEDULE_SETTINGS');
+  if (!raw) return { active: false, days: [], time: '10:00', type: '매일' };
+  try { return JSON.parse(raw); } catch(e) { return { active: false, days: [], time: '10:00', type: '매일' }; }
+}
+
+function saveScheduleSettings(data) {
+  PropertiesService.getScriptProperties().setProperty('SCHEDULE_SETTINGS', JSON.stringify(data));
+  return { success: true };
 }
 
 // ============================================================
