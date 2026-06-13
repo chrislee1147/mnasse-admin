@@ -327,7 +327,7 @@ function setupApprovalSheet() {
   let sheet = ss.getSheetByName(SHEETS.APPROVAL);
   if (!sheet) {
     sheet = ss.insertSheet(SHEETS.APPROVAL);
-    const headers = ['날짜','stem','media_type','folder_type','file','caption','thumbnail','status','post_id','processed_at'];
+    const headers = ['날짜','stem','media_type','folder_type','file','caption','thumbnail','status','post_id','processed_at','thumb2','thumb3','thumb4','thumb5'];
     const hRange = sheet.getRange(1, 1, 1, headers.length);
     hRange.setValues([headers]).setBackground('#8B5CF6').setFontWeight('bold').setFontColor('#FFFFFF');
     sheet.setFrozenRows(1);
@@ -393,7 +393,11 @@ function addApproval(data) {
     data.thumbnail   || '',
     'ready',
     '',   // post_id
-    ''    // processed_at
+    '',   // processed_at
+    data.thumb2 || '',
+    data.thumb3 || '',
+    data.thumb4 || '',
+    data.thumb5 || '',
   ];
 
   // 같은 stem이 이미 있으면 → 전체 행 업데이트 (upsert)
@@ -558,7 +562,7 @@ function setupAll() {
     },
     {
       name: SHEETS.APPROVAL,
-      headers: ['날짜','stem','media_type','folder_type','file','caption','thumbnail','status','post_id','processed_at'],
+      headers: ['날짜','stem','media_type','folder_type','file','caption','thumbnail','status','post_id','processed_at','thumb2','thumb3','thumb4','thumb5'],
       color: '#8B5CF6'
     }
   ];
