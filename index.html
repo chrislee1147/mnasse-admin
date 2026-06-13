@@ -1553,7 +1553,12 @@ setInterval(async () => {
   try {
     const res = await apiGet('getApproval');
     if (Array.isArray(res)) {
-      _updateApprovalBadge(res.filter(i => i.status === 'ready').length);
+      const count = res.filter(i => i.status === 'ready').length;
+      const badge = document.getElementById('approval-badge');
+      if (badge) {
+        if (count <= 0) { badge.style.display = 'none'; }
+        else { badge.textContent = count; badge.style.display = 'inline-flex'; }
+      }
     }
   } catch(e) {}
 }, 60000);
