@@ -76,7 +76,7 @@ function handlePost(body) {
       case 'updateWaitlist':  return updateField(SHEETS.WAITLIST, body.id, body.field, body.value, '이름');
       case 'addKPI':          return addKPI(body.data);
       case 'addApproval':     return addApproval(body.data);
-      case 'approveContent':  return setApprovalStatus(body.stem, 'approved');
+      case 'approveContent':  return approveContent(body.stem, body.editedCaption);
       case 'rejectContent':   return setApprovalStatus(body.stem, 'rejected');
       case 'markPosted':          return markPosted(body.stem, body.postId);
       case 'markRejectedDone':    return setApprovalStatus(body.stem, 'rejected_done');
@@ -382,11 +382,8 @@ function addApproval(data) {
   const sheet = getSheet(SHEETS.APPROVAL);
   if (!sheet) return { error: '포스팅_승인큐 시트 없음 — setupApprovalSheet() 실행 필요' };
 
-  // 같은 stem이 이미 있으면 추가하지 않음 (중복 방지)
-  const existing = _findApprovalRow(sheet, data.stem);
-  if (existing > 0) return { success: true, skipped: true };
-
-  sheet.appendRow([
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const newRow = [
     data.date    || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'),
     data.stem        || '',
     data.media_type  || '',
@@ -397,7 +394,38 @@ function addApproval(data) {
     'ready',
     '',   // post_id
     ''    // processed_at
-  ]);
+  ];
+
+  // 같은 stem이 이미 있으면 → 전체 행 업데이트 (upsert)
+  const existingRow = _findApprovalRow(sheet, data.stem);
+  if (existingRow > 0) {
+    sheet.getRange(existingRow, 1, 1, newRow.length).setValues([newRow]);
+    return { success: true, updated: true };
+  }
+
+  sheet.appendRow(newRow);
+  return { success: true };
+}
+
+function approveContent(stem, editedCaption) {
+  const sheet = getSheet(SHEETS.APPROVAL);
+  if (!sheet) return { error: '포스팅_승인큐 시트 없음' };
+  const rowNum = _findApprovalRow(sheet, stem);
+  if (rowNum < 0) return { error: 'stem 없음: ' + stem };
+
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const statusCol      = headers.indexOf('status') + 1;
+  const processedAtCol = headers.indexOf('processed_at') + 1;
+  const captionCol     = headers.indexOf('caption') + 1;
+
+  if (statusCol > 0) sheet.getRange(rowNum, statusCol).setValue('approved');
+  if (processedAtCol > 0) {
+    sheet.getRange(rowNum, processedAtCol)
+         .setValue(Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'));
+  }
+  if (editedCaption && captionCol > 0) {
+    sheet.getRange(rowNum, captionCol).setValue(editedCaption);
+  }
   return { success: true };
 }
 

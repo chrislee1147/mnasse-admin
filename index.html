@@ -206,6 +206,22 @@ label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px
 
 /* 승인 탭 뱃지 */
 .approval-badge { display: inline-flex; align-items: center; justify-content: center; background: var(--red); color: #fff; border-radius: 10px; font-size: 10px; font-weight: 700; min-width: 16px; height: 16px; padding: 0 4px; margin-left: 5px; vertical-align: middle; line-height: 1; }
+
+/* 캡션 편집 textarea */
+.ig-caption-wrap { font-size: 13px; line-height: 1.65; color: var(--text); margin-bottom: 6px; }
+.ig-caption-wrap .ig-username { font-weight: 700; margin-right: 6px; }
+.ig-caption-textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 13px; line-height: 1.55; padding: 7px 9px; resize: vertical; min-height: 80px; font-family: inherit; display: block; margin-top: 4px; }
+.ig-caption-textarea:focus { border-color: var(--purple); outline: none; }
+
+/* 캐러셀 내비게이션 */
+.carousel-wrap { position: relative; width: 100%; height: 100%; }
+.carousel-slide { display: none; width: 100%; height: 100%; }
+.carousel-slide.active { display: block; }
+.carousel-slide img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.carousel-nav { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.5); border: none; color: #fff; font-size: 28px; cursor: pointer; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 10; padding: 0; line-height: 1; }
+.carousel-prev { left: 8px; }
+.carousel-next { right: 8px; }
+.carousel-nav:hover { background: rgba(0,0,0,0.85); }
 </style>
 </head>
 <body>
@@ -1339,40 +1355,59 @@ function renderApprovalCard(item) {
   const folderType = item.folder_type || '';
 
   const mediaLabel = { carousel:'캐러셀', image:'사진', video:'릴스' }[mediaType] || mediaType;
-  const cardCount  = mediaType === 'carousel' ? 4 : 1;
 
-  // 이미지 영역
-  let imgHtml;
+  // 썸네일 파싱 (JSON 배열 or 단일 base64)
+  let thumbs = [];
   if (item.thumbnail) {
-    imgHtml = `<img src="data:image/jpeg;base64,${item.thumbnail}" alt="미리보기" onerror="this.parentElement.innerHTML='<div class=ig-img-placeholder><span style=font-size:28px;opacity:.3>□</span><span>이미지 미리보기 없음</span></div>'">`;
-  } else {
+    const t = String(item.thumbnail).trim();
+    if (t.startsWith('[')) {
+      try { thumbs = JSON.parse(t); } catch(e) { thumbs = [t]; }
+    } else if (t.length > 0) {
+      thumbs = [t];
+    }
+  }
+  const cardCount = thumbs.length || (mediaType === 'carousel' ? 4 : 1);
+
+  // 이미지/캐러셀 영역
+  let imgHtml;
+  if (thumbs.length === 0) {
     const icon = { carousel:'⬛⬛⬛⬛', image:'□', video:'▷' }[mediaType] || '□';
     imgHtml = `<div class="ig-img-placeholder"><span style="font-size:32px;opacity:.25">${icon}</span><span>${mediaLabel} 준비됨</span></div>`;
+  } else if (thumbs.length === 1) {
+    imgHtml = `<img src="data:image/jpeg;base64,${thumbs[0]}" alt="미리보기" onerror="this.parentElement.innerHTML='<div class=ig-img-placeholder><span style=font-size:28px;opacity:.3>□</span><span>이미지 없음</span></div>'">`;
+  } else {
+    const slides = thumbs.map((t, i) =>
+      `<div class="carousel-slide${i===0?' active':''}" data-idx="${i}">
+        <img src="data:image/jpeg;base64,${t}" alt="${i+1}/${thumbs.length}">
+      </div>`).join('');
+    imgHtml = `<div class="carousel-wrap" id="cwrap-${stem}">
+      ${slides}
+      <button class="carousel-nav carousel-prev" onclick="carouselNav('${stem}',-1)">&#8249;</button>
+      <button class="carousel-nav carousel-next" onclick="carouselNav('${stem}',1)">&#8250;</button>
+    </div>`;
   }
 
   // 캐러셀 도트
   let dotsHtml = '';
-  if (mediaType === 'carousel') {
+  if (cardCount > 1) {
     dotsHtml = `<div class="ig-carousel-dots">${Array(cardCount).fill(0).map((_, i) =>
       `<div class="ig-dot${i === 0 ? ' active' : ''}"></div>`).join('')}</div>`;
   }
 
   // 미디어 태그
-  const mediaTagMap = { carousel:`1 / ${cardCount}`, image:'사진', video:'릴스' };
-  const mediaTag = `<div class="ig-media-tag">${mediaTagMap[mediaType] || mediaType}</div>`;
+  const mediaTag = `<div class="ig-media-tag" id="mtag-${stem}">${cardCount > 1 ? `1 / ${cardCount}` : mediaLabel}</div>`;
 
   // 캡션 파싱 — 해시태그 분리
   const fullCaption = item.caption || '';
   const sepIdx = fullCaption.lastIndexOf('\n.\n.\n.');
-  const captionText  = sepIdx > 0 ? fullCaption.slice(0, sepIdx).trim() : fullCaption.trim();
-  const hashtagText  = sepIdx > 0 ? fullCaption.slice(sepIdx + 6).trim() : '';
+  const captionText = sepIdx > 0 ? fullCaption.slice(0, sepIdx).trim() : fullCaption.trim();
+  const hashtagText = sepIdx > 0 ? fullCaption.slice(sepIdx + 6).trim() : '';
 
   // 날짜
   const dateStr = item['날짜'] || item.date || '';
 
   return `
     <div class="approval-card" id="acard-${stem}">
-      <!-- IG 헤더 -->
       <div class="ig-header">
         <div class="ig-avatar">R</div>
         <div>
@@ -1382,23 +1417,21 @@ function renderApprovalCard(item) {
         <div class="ig-more">···</div>
       </div>
 
-      <!-- 이미지 -->
       <div class="ig-img-wrap">
         ${imgHtml}
         ${dotsHtml}
         ${mediaTag}
       </div>
 
-      <!-- 캡션 + 해시태그 -->
       <div class="ig-body">
         <div class="ig-caption-wrap">
-          <span class="ig-username">rtt_player</span>${escHtml(captionText)}
+          <span class="ig-username">rtt_player</span>
+          <textarea class="ig-caption-textarea" id="cap-${stem}">${escTextarea(captionText)}</textarea>
         </div>
-        ${hashtagText ? `<div class="ig-hashtags">${escHtml(hashtagText)}</div>` : ''}
+        ${hashtagText ? `<div class="ig-hashtags" id="htag-${stem}">${escHtml(hashtagText)}</div>` : ''}
         ${dateStr ? `<div class="ig-date">${dateStr}</div>` : ''}
       </div>
 
-      <!-- 버튼 -->
       <div class="ig-actions" id="aactions-${stem}">
         <button class="ig-btn ig-btn-approve" onclick="approvePost('${stem}',this)">승인 — 포스팅</button>
         <button class="ig-btn ig-btn-reject"  onclick="rejectPost('${stem}',this)">거절</button>
@@ -1412,14 +1445,44 @@ function escHtml(str) {
     .replace(/"/g,'&quot;').replace(/\n/g,'<br>');
 }
 
+function escTextarea(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function carouselNav(stem, dir) {
+  const wrap = document.getElementById('cwrap-' + stem);
+  if (!wrap) return;
+  const slides = wrap.querySelectorAll('.carousel-slide');
+  let cur = [...slides].findIndex(s => s.classList.contains('active'));
+  slides[cur].classList.remove('active');
+  cur = (cur + dir + slides.length) % slides.length;
+  slides[cur].classList.add('active');
+  const tag = document.getElementById('mtag-' + stem);
+  if (tag) tag.textContent = `${cur + 1} / ${slides.length}`;
+  const card = document.getElementById('acard-' + stem);
+  if (card) card.querySelectorAll('.ig-dot').forEach((d, i) => d.classList.toggle('active', i === cur));
+}
+
 async function approvePost(stem, btn) {
   btn.disabled = true;
   const siblingBtn = btn.parentElement.querySelector('.ig-btn-reject');
   if (siblingBtn) siblingBtn.disabled = true;
   btn.textContent = '처리 중...';
 
+  // 편집된 캡션 수집
+  const capEl  = document.getElementById('cap-' + stem);
+  const htagEl = document.getElementById('htag-' + stem);
+  let editedCaption = undefined;
+  if (capEl) {
+    const bodyText = capEl.value.trim();
+    const hashText = htagEl ? htagEl.textContent.trim() : '';
+    editedCaption = hashText ? `${bodyText}\n.\n.\n.${hashText}` : bodyText;
+  }
+
   try {
-    const res = await apiPost({ action: 'approveContent', stem });
+    const payload = { action: 'approveContent', stem };
+    if (editedCaption) payload.editedCaption = editedCaption;
+    const res = await apiPost(payload);
     if (!res.error) {
       document.getElementById('aactions-' + stem).innerHTML =
         `<div class="ig-done-msg" style="color:var(--green)">승인 완료 — 포스팅 처리 중 (최대 15초)</div>`;
