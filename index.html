@@ -1547,21 +1547,6 @@ function _updateApprovalBadge(delta) {
   else { badge.textContent = next; badge.style.display = 'inline-flex'; }
 }
 
-// 백그라운드 뱃지 폴링 (60초 간격, 어느 탭에 있든)
-setInterval(async () => {
-  if (!_gas_url_cached()) return;
-  try {
-    const res = await apiGet('getApproval');
-    if (Array.isArray(res)) {
-      const count = res.filter(i => i.status === 'ready').length;
-      const badge = document.getElementById('approval-badge');
-      if (badge) {
-        if (count <= 0) { badge.style.display = 'none'; }
-        else { badge.textContent = count; badge.style.display = 'inline-flex'; }
-      }
-    }
-  } catch(e) {}
-}, 60000);
 
 function _gas_url_cached() {
   return localStorage.getItem('mnasse_script_url') || '';
