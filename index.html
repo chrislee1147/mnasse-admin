@@ -1337,7 +1337,7 @@ async function loadApproval(manual) {
   loadingEl.style.display = 'none';
 
   const ready = items.filter(i => i.status === 'ready');
-  _updateApprovalBadge(ready.length);
+  _updateApprovalBadge(ready.length, true);
 
   if (ready.length === 0) {
     emptyEl.style.display = 'block';
@@ -1538,11 +1538,10 @@ async function rejectPost(stem, btn) {
   }
 }
 
-function _updateApprovalBadge(delta) {
+function _updateApprovalBadge(value, absolute = false) {
   const badge = document.getElementById('approval-badge');
   if (!badge) return;
-  const cur = parseInt(badge.textContent) || 0;
-  const next = typeof delta === 'number' ? cur + delta : delta;
+  const next = absolute ? value : (parseInt(badge.textContent) || 0) + value;
   if (next <= 0) { badge.style.display = 'none'; }
   else { badge.textContent = next; badge.style.display = 'inline-flex'; }
 }
