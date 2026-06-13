@@ -382,7 +382,6 @@ function addApproval(data) {
   const sheet = getSheet(SHEETS.APPROVAL);
   if (!sheet) return { error: '포스팅_승인큐 시트 없음 — setupApprovalSheet() 실행 필요' };
 
-  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   const newRow = [
     data.date    || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'),
     data.stem        || '',
@@ -394,10 +393,6 @@ function addApproval(data) {
     'ready',
     '',   // post_id
     '',   // processed_at
-    data.thumb2 || '',
-    data.thumb3 || '',
-    data.thumb4 || '',
-    data.thumb5 || '',
   ];
 
   // 같은 stem이 이미 있으면 → 전체 행 업데이트 (upsert)
