@@ -1311,8 +1311,6 @@ async function saveSchedule() {
 // ============================================================
 // 포스팅 승인
 // ============================================================
-let _approvalPollTimer = null;
-
 async function loadApproval(manual) {
   if (!checkSetup()) return;
 
@@ -1345,12 +1343,6 @@ async function loadApproval(manual) {
     listEl.innerHTML = ready.map(renderApprovalCard).join('');
   }
 
-  // 자동 폴링 30초
-  clearTimeout(_approvalPollTimer);
-  _approvalPollTimer = setTimeout(() => {
-    const approvalPanel = document.getElementById('tab-approval');
-    if (approvalPanel && approvalPanel.classList.contains('active')) loadApproval();
-  }, 30000);
 }
 
 function renderApprovalCard(item) {
