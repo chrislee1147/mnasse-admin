@@ -245,6 +245,7 @@ label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px
     <button class="tab-btn" data-tab="content">콘텐츠</button>
     <button class="tab-btn" data-tab="funnel">퍼널 분석</button>
     <button class="tab-btn" data-tab="roadmap">로드맵</button>
+    <button class="tab-btn" data-tab="tracking">매물 트래킹</button>
     <button class="tab-btn" data-tab="approval">포스팅 승인<span class="approval-badge" id="approval-badge" style="display:none"></span></button>
   </nav>
 
@@ -365,9 +366,21 @@ label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px
 
     <!-- ── 로드맵 ── -->
     <div class="tab-panel" id="tab-roadmap">
-      <div class="card" style="margin-top:8px">
+      <div class="alert alert-warning" style="margin-top:8px;margin-bottom:8px">
+        Phase 2·3 백엔드 자동화 개발 현재 홀드 — card_maker.py / watch.py / CRON 등 Phase 1 실전 검증 완료 후 재개
+      </div>
+      <div class="card" style="margin-top:0">
         <div class="roadmap" id="roadmap-content"></div>
       </div>
+    </div>
+
+    <!-- ── 매물 트래킹 ── -->
+    <div class="tab-panel" id="tab-tracking">
+      <div class="flex items-center gap8 mt8" style="margin-bottom:12px">
+        <span class="section-title" style="margin:0">매물 트래킹</span>
+        <button class="btn btn-primary btn-sm ml-auto" onclick="openTrackModal()">+ 매물 등록</button>
+      </div>
+      <div class="kanban" id="tracking-kanban"></div>
     </div>
 
     <!-- ── 포스팅 승인 ── -->
@@ -556,6 +569,28 @@ label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px
   </div>
 </div>
 
+<!-- ── 모달: 매물 등록 ── -->
+<div class="modal-overlay" id="track-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">매물 등록</span>
+      <button class="modal-close" onclick="closeModal('track-modal')">×</button>
+    </div>
+    <div class="form-group"><label>모델명</label><input type="text" id="track-model" placeholder="스카이캠프 2.0 / 헬리오스 600 등"></div>
+    <div class="grid-2 gap8">
+      <div class="form-group"><label>매입가 (만원)</label><input type="number" id="track-buy" placeholder="120"></div>
+      <div class="form-group"><label>판매가 (만원)</label><input type="number" id="track-sell" placeholder="165"></div>
+    </div>
+    <div class="form-group"><label>수리비 (만원)</label><input type="number" id="track-repair" placeholder="0" value="0"></div>
+    <div class="form-group" style="display:flex;align-items:center;gap:8px;padding:4px 0">
+      <input type="checkbox" id="track-restructured" style="width:auto;margin:0">
+      <label style="margin:0;cursor:pointer;color:var(--text)" for="track-restructured">구조변경 Y</label>
+    </div>
+    <div class="form-group"><label>메모</label><textarea id="track-memo" rows="2" placeholder="특이사항, 입고 경로 등"></textarea></div>
+    <button class="btn btn-primary w100" onclick="submitTrackItem()">등록</button>
+  </div>
+</div>
+
 <!-- ── 모달: 재고 추가 ── -->
 <div class="modal-overlay" id="inv-modal">
   <div class="modal">
@@ -673,6 +708,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 
 function loadTab(tab) {
   if (tab === 'roadmap') { renderRoadmap(); return; }
+  if (tab === 'tracking') { loadTrackingKanban(); return; }
   if (tab === 'approval') { loadApproval(); loadSchedule(); return; }
   if (!checkSetup()) return;
   switch (tab) {
@@ -1179,47 +1215,36 @@ function renderFunnelBars(elId, funnel, color) {
 // ============================================================
 const ROADMAP = [
   {
-    phase: 'Phase 1 — 퍼널 구축 + 테스트', active: true, done: false,
-    trigger: '트리거: 매입+매출 각 3건 리드 확보',
+    phase: 'Phase 1 — 1대 사서 1대 팔기 (현재)', active: true, done: false,
+    trigger: '현재 진행 중',
     items: [
-      '어드민 완성 (지금 보고 있는 이것)',
-      '인스타 개설 + 첫 콘텐츠 10개',
-      '블로그 글 5개 (검색 상위 노출용)',
-      'DM/문자 받고 → 어드민 리드 입력 루틴 정착',
-      '매입 DM 응대 스크립트 준비',
-      '매출 DM 응대 스크립트 준비',
-      '첫 매입 리드 확보',
-      '첫 매출 리드 확보',
+      '매입 광고 집행 (인스타·블로그·릴스)',
+      'DM 유입 → 어드민에 리드 입력',
+      '현장 방문·점검·흥정 → 매입 확정',
+      '사진·영상 촬영',
+      '캡컷 편집',
+      '인스타·블로그·릴스 업로드',
+      '판매·정산',
     ]
   },
   {
-    phase: 'Phase 2 — 첫 거래 + 프로세스 검증', active: false, done: false,
-    trigger: '트리거: 매입·판매 각 3건 × 3개월 연속',
+    phase: 'Phase 2 — 반자동화 (검증 후)', active: false, done: false,
+    trigger: '트리거: Phase 1 완료 후 재개 (현재 홀드)',
     items: [
-      '첫 매입 1대 실행 (위탁 or 확실한 건)',
-      '검수·수리 프로세스 1회전 실측',
-      '첫 판매 1대 성사',
-      '전 과정 데이터 기록·분석',
-      '단위경제 실측치 → 시트 갱신',
+      '매입→판매 3회전 실측',
+      '단위경제 데이터 확인',
+      '반자동 콘텐츠 파이프라인 가동',
+      'watch.py 자동화 적용',
     ]
   },
   {
-    phase: 'Phase 3 — 규모 확장', active: false, done: false,
-    trigger: '트리거: 월 10건 + 해외 첫 거래 완료',
+    phase: 'Phase 3 — 인스타·블로그 완전 자동화', active: false, done: false,
+    trigger: '트리거: 월 거래 3건 이상 안정화 후 재개 (현재 홀드)',
     items: [
-      'KPL 물류 본격 연계',
-      '전국 딜러 위탁매입 시작',
-      'BaseCamper / eBay 해외 리스팅 테스트',
-      '월 10건 달성',
-    ]
-  },
-  {
-    phase: 'Phase 4 — 전국화 + 글로벌', active: false, done: false,
-    trigger: '트리거: 월 30건 + 해외 비중 30%+',
-    items: [
-      '전국 아이캠퍼 딜러 네트워크 가동',
-      '지방 셔틀트럭 합차 수거 시작',
-      '북미·캐나다·호주 진출',
+      '인스타 자동 포스팅 CRON 가동',
+      '블로그 자동 발행',
+      '릴스 자동화',
+      '콘텐츠 파이프라인 무인 운영',
     ]
   }
 ];
@@ -1253,6 +1278,126 @@ function toggleCheck(key, el) {
   const textEl = el.nextElementSibling;
   textEl.style.color = checks[key] ? 'var(--muted)' : '';
   textEl.style.textDecoration = checks[key] ? 'line-through' : '';
+}
+
+// ============================================================
+// 매물 트래킹 (localStorage 기반)
+// ============================================================
+const TRACK_STAGES = ['매입 광고 중', 'DM 협의 중', '점검·흥정', '매입 완료', '콘텐츠 제작 중', '판매 중', '판매 완료'];
+const TRACK_KEY = 'rtt_tracking_items';
+
+function getTrackItems() {
+  try { return JSON.parse(localStorage.getItem(TRACK_KEY) || '[]'); } catch(e) { return []; }
+}
+function saveTrackItems(items) { localStorage.setItem(TRACK_KEY, JSON.stringify(items)); }
+
+function loadTrackingKanban() {
+  const items = getTrackItems();
+  const kanban = document.getElementById('tracking-kanban');
+  kanban.innerHTML = TRACK_STAGES.map(stage => {
+    const cards = items.filter(i => i.stage === stage);
+    return `
+      <div class="kanban-col" style="min-width:150px">
+        <div class="kanban-col-header">
+          <span style="font-size:10px">${stage}</span>
+          <span class="kanban-col-count">${cards.length}</span>
+        </div>
+        <div class="kanban-cards">
+          ${cards.map(c => renderTrackCard(c)).join('') || '<div style="font-size:11px;color:var(--muted);padding:8px 0">없음</div>'}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function renderTrackCard(item) {
+  const profit = (parseFloat(item.salePrice) || 0) - (parseFloat(item.buyPrice) || 0) - (parseFloat(item.repairCost) || 0);
+  const hasProfit = item.buyPrice || item.salePrice;
+  const profitColor = profit > 0 ? 'var(--green)' : profit < 0 ? 'var(--red)' : 'var(--muted)';
+  return `
+    <div class="k-card" onclick="openTrackDetailModal('${item.id}')">
+      <div class="k-card-name">${item.model || '모델 미상'}</div>
+      <div class="k-card-model" style="font-size:11px">
+        매입 ${item.buyPrice ? item.buyPrice + '만' : '—'} / 판가 ${item.salePrice ? item.salePrice + '만' : '—'}
+      </div>
+      <div class="k-card-meta" style="margin-top:4px">
+        ${item.restructured ? '<span class="badge badge-amber" style="font-size:10px">구조변경</span>' : ''}
+        ${hasProfit ? `<span style="font-size:11px;color:${profitColor};font-weight:700">${profit >= 0 ? '+' : ''}${profit}만</span>` : ''}
+      </div>
+    </div>`;
+}
+
+function openTrackModal() {
+  document.getElementById('track-modal').classList.add('open');
+}
+
+function openTrackDetailModal(id) {
+  const items = getTrackItems();
+  const item = items.find(i => i.id === id);
+  if (!item) return;
+  const profit = (parseFloat(item.salePrice) || 0) - (parseFloat(item.buyPrice) || 0) - (parseFloat(item.repairCost) || 0);
+  const profitColor = profit >= 0 ? 'var(--green)' : 'var(--red)';
+
+  document.getElementById('card-modal-title').textContent = item.model || '매물 상세';
+  document.getElementById('card-modal-body').innerHTML = `
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.8">
+      매입가: <b style="color:var(--text)">${item.buyPrice || '—'}만</b> &nbsp;|&nbsp;
+      판매가: <b style="color:var(--text)">${item.salePrice || '—'}만</b><br>
+      수리비: <b style="color:var(--text)">${item.repairCost || 0}만</b> &nbsp;|&nbsp;
+      구조변경: <b style="color:var(--text)">${item.restructured ? 'Y' : 'N'}</b><br>
+      순수익: <b style="color:${profitColor};font-size:15px">${profit >= 0 ? '+' : ''}${profit}만원</b>
+    </div>
+    ${item.memo ? `<div style="background:var(--bg);padding:8px;border-radius:6px;font-size:12px;margin-bottom:12px;color:var(--muted)">${item.memo}</div>` : ''}
+    <div style="font-size:12px;color:var(--muted);margin-bottom:6px">단계 변경:</div>
+    <div class="stage-btns">
+      ${TRACK_STAGES.map(s => `
+        <button class="stage-btn${s === item.stage ? ' current' : ''}"
+          onclick="changeTrackStage('${id}','${s}')">
+          ${s}
+        </button>`).join('')}
+    </div>
+    <div style="margin-top:14px">
+      <button class="btn btn-ghost btn-sm w100" style="color:var(--red);border-color:var(--red)" onclick="deleteTrackItem('${id}')">매물 삭제</button>
+    </div>`;
+  document.getElementById('card-modal').classList.add('open');
+}
+
+function changeTrackStage(id, stage) {
+  const items = getTrackItems();
+  const idx = items.findIndex(i => i.id === id);
+  if (idx >= 0) { items[idx].stage = stage; saveTrackItems(items); }
+  closeModal('card-modal');
+  loadTrackingKanban();
+}
+
+function deleteTrackItem(id) {
+  if (!confirm('이 매물을 삭제하겠습니까?')) return;
+  saveTrackItems(getTrackItems().filter(i => i.id !== id));
+  closeModal('card-modal');
+  loadTrackingKanban();
+}
+
+function submitTrackItem() {
+  const model = document.getElementById('track-model').value.trim();
+  if (!model) { alert('모델명을 입력하세요.'); return; }
+  const items = getTrackItems();
+  items.push({
+    id: Date.now().toString(),
+    model,
+    buyPrice:    document.getElementById('track-buy').value,
+    salePrice:   document.getElementById('track-sell').value,
+    repairCost:  document.getElementById('track-repair').value || '0',
+    restructured: document.getElementById('track-restructured').checked,
+    memo:        document.getElementById('track-memo').value,
+    stage:       '매입 광고 중',
+    createdAt:   new Date().toISOString(),
+  });
+  saveTrackItems(items);
+  closeModal('track-modal');
+  ['track-model','track-buy','track-sell','track-repair','track-memo'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('track-restructured').checked = false;
+  loadTrackingKanban();
 }
 
 // ============================================================
