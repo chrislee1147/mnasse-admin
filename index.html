@@ -631,8 +631,6 @@ async function apiPost(body) {
 // 탭
 // ============================================================
 let loadedTabs = {};
-let _pipelineCache = [];
-let _cfg = { pipelineStages: [], channels: [], modelOptions: [], settlementItems: [] };
 
 document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
