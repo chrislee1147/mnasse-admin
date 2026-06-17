@@ -65,6 +65,7 @@ function handleGet(p) {
       case 'getProcessTrigger':   return getProcessTrigger();
       case 'clearProcessTrigger': return clearProcessTrigger();
       case 'getScheduleSettings': return getScheduleSettings();
+      case 'setupSheets':         return setupSheets();
       default: return { error: '알 수 없는 액션: ' + p.action };
     }
   } catch (e) { return { error: e.message }; }
@@ -412,6 +413,47 @@ function addKPI(data) {
     data.cafeViews || 0, data.purchaseConvert || 0, data.salesConvert || 0
   ]);
   return { success: true };
+}
+
+// ============================================================
+// 시트 자동 생성
+// ============================================================
+
+function setupSheets() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  function ensureSheet(name, headers) {
+    let sheet = ss.getSheetByName(name);
+    if (!sheet) {
+      sheet = ss.insertSheet(name);
+      sheet.appendRow(headers);
+      sheet.getRange(1, 1, 1, headers.length)
+        .setFontWeight('bold')
+        .setBackground('#1a1d26')
+        .setFontColor('#e8eaf0');
+      sheet.setFrozenRows(1);
+    }
+    return sheet;
+  }
+
+  ensureSheet(SHEETS.PIPELINE, [
+    '관리번호','유형','모델명','유입일','작업일','단계',
+    '매입가','판매가','구조변경','오랜케이정산','순수익','메모','최종수정일'
+  ]);
+  ensureSheet(SHEETS.WAITLIST, [
+    '날짜','이름','연락처','원하는모델','예산','알림상태','매칭관리번호','메모'
+  ]);
+  ensureSheet(SHEETS.INVENTORY, [
+    '모델','등급','매입가','판매가','수리내역','수리비','리스팅채널','판매상태','보관일수','메모'
+  ]);
+  ensureSheet(SHEETS.CONTENT, [
+    '채널','유형','제목','발행일','URL','상태','메모'
+  ]);
+  ensureSheet(SHEETS.KPI, [
+    '날짜','매입건수','매출건수','순수익합계','재고수','대기자수'
+  ]);
+
+  return { ok: true };
 }
 
 // ============================================================

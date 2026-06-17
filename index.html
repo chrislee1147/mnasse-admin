@@ -1634,6 +1634,7 @@ async function initApp() {
   loadedTabs.roadmap = true;
 
   if (!checkSetup()) return;
+  await apiGet('setupSheets'); // 시트 없으면 자동 생성
   const cfg = await apiGet('config');
   _cfg = Object.assign(_cfg, cfg);
   CONFIG = cfg; // legacy compat
